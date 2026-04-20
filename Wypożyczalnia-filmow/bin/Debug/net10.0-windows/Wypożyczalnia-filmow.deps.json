@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "Wypożyczalnia-filmow/1.0.0": {
+        "runtime": {
+          "Wypożyczalnia-filmow.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Wypożyczalnia-filmow/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
