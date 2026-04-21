@@ -5,6 +5,10 @@
     {
       "AbsoluteMoniker": "D:0:0:{57AA428A-0B38-455A-B452-7EE8CCFEC55F}|Wypo\u017Cyczalnia-filmow\\Wypo\u017Cyczalnia-filmow.csproj|c:\\users\\phil\\source\\repos\\wypo\u017Cyczalnia-filmow\\wypo\u017Cyczalnia-filmow\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
       "RelativeMoniker": "D:0:0:{57AA428A-0B38-455A-B452-7EE8CCFEC55F}|Wypo\u017Cyczalnia-filmow\\Wypo\u017Cyczalnia-filmow.csproj|solutionrelative:wypo\u017Cyczalnia-filmow\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{57AA428A-0B38-455A-B452-7EE8CCFEC55F}|Wypo\u017Cyczalnia-filmow\\Wypo\u017Cyczalnia-filmow.csproj|c:\\users\\phil\\source\\repos\\wypo\u017Cyczalnia-filmow\\wypo\u017Cyczalnia-filmow\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{57AA428A-0B38-455A-B452-7EE8CCFEC55F}|Wypo\u017Cyczalnia-filmow\\Wypo\u017Cyczalnia-filmow.csproj|solutionrelative:wypo\u017Cyczalnia-filmow\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -24,16 +28,29 @@
         },
         {
           "DockedWidth": 351,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 1,
           "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Form1.cs",
+              "DocumentMoniker": "C:\\Users\\phil\\source\\repos\\Wypo\u017Cyczalnia-filmow\\Wypo\u017Cyczalnia-filmow\\Form1.cs",
+              "RelativeDocumentMoniker": "Wypo\u017Cyczalnia-filmow\\Form1.cs",
+              "ToolTip": "C:\\Users\\phil\\source\\repos\\Wypo\u017Cyczalnia-filmow\\Wypo\u017Cyczalnia-filmow\\Form1.cs",
+              "RelativeToolTip": "Wypo\u017Cyczalnia-filmow\\Form1.cs",
+              "ViewState": "AgIAAAQAAAAAAAAAAAAowBAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-20T19:50:39.622Z",
+              "EditorCaption": ""
+            },
             {
               "$type": "Document",
               "DocumentIndex": 0,
               "Title": "Form1.cs [Design]",
               "DocumentMoniker": "C:\\Users\\phil\\source\\repos\\Wypo\u017Cyczalnia-filmow\\Wypo\u017Cyczalnia-filmow\\Form1.cs",
               "RelativeDocumentMoniker": "Wypo\u017Cyczalnia-filmow\\Form1.cs",
-              "ToolTip": "C:\\Users\\phil\\source\\repos\\Wypo\u017Cyczalnia-filmow\\Wypo\u017Cyczalnia-filmow\\Form1.cs [Design]*",
-              "RelativeToolTip": "Wypo\u017Cyczalnia-filmow\\Form1.cs [Design]*",
+              "ToolTip": "C:\\Users\\phil\\source\\repos\\Wypo\u017Cyczalnia-filmow\\Wypo\u017Cyczalnia-filmow\\Form1.cs [Design]",
+              "RelativeToolTip": "Wypo\u017Cyczalnia-filmow\\Form1.cs [Design]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-04-20T19:32:23.102Z",
               "EditorCaption": " [Design]"
