@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Wypożyczalnia-filmow")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+eb98b55d6d62e1d3675fe03698565896d1411d6d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f46b87f437638383fe650448e9c712835ebaec42")]
 [assembly: System.Reflection.AssemblyProductAttribute("Wypożyczalnia-filmow")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Wypożyczalnia-filmow")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

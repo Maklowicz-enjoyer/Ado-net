@@ -22,3 +22,4 @@ C:\Users\Admin\Desktop\Ado-net\Wypożyczalnia-filmow\obj\Debug\net8.0-windows\re
 C:\Users\Admin\Desktop\Ado-net\Wypożyczalnia-filmow\obj\Debug\net8.0-windows\Wypożyczalnia-filmow.pdb
 C:\Users\Admin\Desktop\Ado-net\Wypożyczalnia-filmow\obj\Debug\net8.0-windows\Wypożyczalnia-filmow.genruntimeconfig.cache
 C:\Users\Admin\Desktop\Ado-net\Wypożyczalnia-filmow\obj\Debug\net8.0-windows\ref\Wypożyczalnia-filmow.dll
+C:\Users\Admin\Desktop\Ado-net\Wypożyczalnia-filmow\obj\Debug\net8.0-windows\Wypożyczalnia_filmow.FormDodajFilm.resources

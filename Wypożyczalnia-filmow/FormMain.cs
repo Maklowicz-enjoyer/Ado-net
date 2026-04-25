@@ -7,9 +7,11 @@ namespace Wypożyczalnia_filmow
 {
     public partial class FormMain : Form
     {
-        // ID zalogowanego klienta – zmień na mechanizm logowania gdy będziesz gotowy
         private int _klientId = 1;
         private string _klientNazwa = "";
+
+        // BindingSource dla wypożyczeń – analogicznie do bsFilmy z Designera
+        private System.Windows.Forms.BindingSource bsWypozyczenia = new System.Windows.Forms.BindingSource();
 
         public FormMain()
         {
@@ -25,6 +27,7 @@ namespace Wypożyczalnia_filmow
             ZaladujKlienta();
             ZaladujFilmy();
             ZaladujWypozyczenia();
+            ZaladujZarzadzanie();
         }
 
         // ─────────────────────────────────────────────
@@ -33,60 +36,77 @@ namespace Wypożyczalnia_filmow
 
         private void ZaladujKlienta()
         {
-            string sql = @"SELECT Imie, Nazwisko FROM Klienci WHERE KlientID = @id";
+            NpgsqlConnection conn = Database.GetConnection();
+            NpgsqlCommand cmd = new NpgsqlCommand();
 
-            using var conn = Database.GetConnection();
-            conn.Open();
-            using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@id", _klientId);
-
-            using var reader = cmd.ExecuteReader();
-            if (reader.Read())
+            try
             {
-                _klientNazwa = $"{reader["Imie"]} {reader["Nazwisko"]}";
-                lblKlient.Text = $"Klient: {_klientNazwa}";
+                cmd.CommandText = "SELECT imie, nazwisko FROM klienci WHERE klientid = @id";
+                cmd.Connection = conn;
+                cmd.Parameters.AddWithValue("@id", _klientId);
+
+                conn.Open();
+
+                NpgsqlDataReader dr = cmd.ExecuteReader();
+
+                if (dr.Read())
+                {
+                    _klientNazwa = $"{dr.GetString(0)} {dr.GetString(1)}";
+                    lblKlient.Text = $"Klient: {_klientNazwa}";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Błąd: {ex.Message}");
+            }
+            finally
+            {
+                conn.Close();
             }
         }
 
         // ─────────────────────────────────────────────
-        // KATALOG FILMÓW
+        // KATALOG FILMÓW – SELECT z widoku v_katalog_filmow
         // ─────────────────────────────────────────────
 
         private void ZaladujFilmy(string filtr = "")
         {
-            string sql = @"
-                SELECT f.FilmID, f.Tytul, g.Nazwa AS Gatunek, f.RokProdukcji,
-                       f.Rezyser, f.DostepneKopie, f.CenaZaDzien
-                FROM Filmy f
-                JOIN Gatunki g ON f.GatunekID = g.GatunekID
-                WHERE (@filtr = '' OR LOWER(f.Tytul) LIKE '%' || LOWER(@filtr) || '%'
-                               OR LOWER(g.Nazwa) LIKE '%' || LOWER(@filtr) || '%')
-                ORDER BY f.Tytul";
+            NpgsqlConnection conn = Database.GetConnection();
+            NpgsqlDataAdapter adp = new NpgsqlDataAdapter();
+            DataSet dsB = new DataSet();
 
-            using var conn = Database.GetConnection();
-            conn.Open();
-            using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@filtr", filtr);
+            // Widok v_katalog_filmow zawiera już JOIN z gatunkami –
+            // nie trzeba go tutaj powtarzać
+            string STR_SELECT =
+                "SELECT filmid, tytul, gatunek, rokprodukcji, rezyser, dostepnekopie, cenazadzien " +
+                "FROM v_katalog_filmow " +
+                "WHERE @filtr = '' OR LOWER(tytul)   LIKE '%' || LOWER(@filtr) || '%' " +
+                "                  OR LOWER(gatunek) LIKE '%' || LOWER(@filtr) || '%' " +
+                "ORDER BY tytul";
 
-            var adapter = new NpgsqlDataAdapter(cmd);
-            var dt = new DataTable();
-            adapter.Fill(dt);
+            try
+            {
+                adp = new NpgsqlDataAdapter(STR_SELECT, conn);
+                adp.SelectCommand.Parameters.AddWithValue("@filtr", filtr);
+                adp.Fill(dsB, "filmy");
 
-            // Podpinamy do BindingSource
-            bsFilmy.DataSource = dt;
-            dgvFilmy.DataSource = bsFilmy;
+                bsFilmy.DataSource = dsB.Tables["filmy"];
+                dgvFilmy.DataSource = bsFilmy;
 
-            // Ukryj kolumnę ID (potrzebna w kodzie, nie dla użytkownika)
-            if (dgvFilmy.Columns["FilmID"] != null)
-                dgvFilmy.Columns["FilmID"].Visible = false;
+                if (dgvFilmy.Columns["filmid"] != null)
+                    dgvFilmy.Columns["filmid"].Visible = false;
 
-            // Nazwy kolumn po polsku
-            if (dgvFilmy.Columns["Tytul"] != null)       dgvFilmy.Columns["Tytul"].HeaderText       = "Tytuł";
-            if (dgvFilmy.Columns["Gatunek"] != null)     dgvFilmy.Columns["Gatunek"].HeaderText     = "Gatunek";
-            if (dgvFilmy.Columns["RokProdukcji"] != null)dgvFilmy.Columns["RokProdukcji"].HeaderText= "Rok";
-            if (dgvFilmy.Columns["Rezyser"] != null)     dgvFilmy.Columns["Rezyser"].HeaderText     = "Reżyser";
-            if (dgvFilmy.Columns["DostepneKopie"] != null)dgvFilmy.Columns["DostepneKopie"].HeaderText = "Dostępne kopie";
-            if (dgvFilmy.Columns["CenaZaDzien"] != null) dgvFilmy.Columns["CenaZaDzien"].HeaderText = "Cena / dzień";
+                if (dgvFilmy.Columns["tytul"] != null) dgvFilmy.Columns["tytul"].HeaderText = "Tytuł";
+                if (dgvFilmy.Columns["gatunek"] != null) dgvFilmy.Columns["gatunek"].HeaderText = "Gatunek";
+                if (dgvFilmy.Columns["rokprodukcji"] != null) dgvFilmy.Columns["rokprodukcji"].HeaderText = "Rok";
+                if (dgvFilmy.Columns["rezyser"] != null) dgvFilmy.Columns["rezyser"].HeaderText = "Reżyser";
+                if (dgvFilmy.Columns["dostepnekopie"] != null) dgvFilmy.Columns["dostepnekopie"].HeaderText = "Dostępne kopie";
+                if (dgvFilmy.Columns["cenazadzien"] != null) dgvFilmy.Columns["cenazadzien"].HeaderText = "Cena / dzień";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Błąd: {ex.Message}");
+            }
         }
 
         private void txtSzukaj_TextChanged(object sender, EventArgs e)
@@ -95,17 +115,17 @@ namespace Wypożyczalnia_filmow
         }
 
         // ─────────────────────────────────────────────
-        // WYPOŻYCZANIE
+        // WYPOŻYCZANIE – INSERT przez adapter + DataSet
         // ─────────────────────────────────────────────
 
         private void btnWypozycz_Click(object sender, EventArgs e)
         {
             if (dgvFilmy.CurrentRow == null) return;
 
-            int filmId     = Convert.ToInt32(dgvFilmy.CurrentRow.Cells["FilmID"].Value);
-            string tytul   = dgvFilmy.CurrentRow.Cells["Tytul"].Value.ToString()!;
-            int kopie      = Convert.ToInt32(dgvFilmy.CurrentRow.Cells["DostepneKopie"].Value);
-            decimal cena   = Convert.ToDecimal(dgvFilmy.CurrentRow.Cells["CenaZaDzien"].Value);
+            int filmId = Convert.ToInt32(dgvFilmy.CurrentRow.Cells["filmid"].Value);
+            string tytul = dgvFilmy.CurrentRow.Cells["tytul"].Value.ToString()!;
+            int kopie = Convert.ToInt32(dgvFilmy.CurrentRow.Cells["dostepnekopie"].Value);
+            decimal cena = Convert.ToDecimal(dgvFilmy.CurrentRow.Cells["cenazadzien"].Value);
 
             if (kopie <= 0)
             {
@@ -114,7 +134,6 @@ namespace Wypożyczalnia_filmow
                 return;
             }
 
-            // Sprawdź czy klient nie ma za dużo aktywnych wypożyczeń (limit 3)
             if (LiczbaAktywnychWypozyczen() >= 3)
             {
                 MessageBox.Show("Osiągnąłeś limit 3 aktywnych wypożyczeń.", "Limit wypożyczeń",
@@ -136,34 +155,60 @@ namespace Wypożyczalnia_filmow
 
             if (wynik != DialogResult.Yes) return;
 
-            using var conn = Database.GetConnection();
-            conn.Open();
-            using var trans = conn.BeginTransaction();
+            NpgsqlConnection conn = Database.GetConnection();
+            NpgsqlDataAdapter adp = new NpgsqlDataAdapter();
+            DataSet dsB = new DataSet();
+            DataSet dsF = new DataSet();
+
+            string STR_SELECT = "SELECT wypozyczenieID, klientid, filmid, datawypozyczenia, terminzwrotu, status " +
+                                 "FROM wypozyczenia WHERE klientid = @klientId";
+            string STR_INSERT = "INSERT INTO wypozyczenia (klientid, filmid, datawypozyczenia, terminzwrotu, status) " +
+                                  "VALUES (@klientId, @filmId, @data, @termin, @status)";
+            string STR_UPD_KOPIE = "UPDATE filmy SET dostepnekopie = dostepnekopie - 1 WHERE filmid = @filmId";
+
+            NpgsqlCommand cmdInsert = new NpgsqlCommand(STR_INSERT, conn);
+            cmdInsert.Parameters.Add("@klientId", NpgsqlTypes.NpgsqlDbType.Integer, 0, "klientid");
+            cmdInsert.Parameters.Add("@filmId", NpgsqlTypes.NpgsqlDbType.Integer, 0, "filmid");
+            cmdInsert.Parameters.Add("@data", NpgsqlTypes.NpgsqlDbType.Date, 0, "datawypozyczenia");
+            cmdInsert.Parameters.Add("@termin", NpgsqlTypes.NpgsqlDbType.Date, 0, "terminzwrotu");
+            cmdInsert.Parameters.Add("@status", NpgsqlTypes.NpgsqlDbType.Text, 0, "status");
+
+            NpgsqlCommand cmdKopie = new NpgsqlCommand(STR_UPD_KOPIE, conn);
+            cmdKopie.Parameters.AddWithValue("@filmId", filmId);
+
+            adp = new NpgsqlDataAdapter(STR_SELECT, conn);
+            adp.SelectCommand.Parameters.AddWithValue("@klientId", _klientId);
+            adp.InsertCommand = cmdInsert;
 
             try
             {
-                // Dodaj wypożyczenie
-                string sqlWypozyczenie = @"
-                    INSERT INTO Wypozyczenia (KlientID, FilmID, DataWypozyczenia, TerminZwrotu, Status)
-                    VALUES (@klientId, @filmId, @data, @termin, 'Aktywne')";
+                adp.Fill(dsB, "wypozyczenia");
 
-                using var cmdW = new NpgsqlCommand(sqlWypozyczenie, conn, trans);
-                cmdW.Parameters.AddWithValue("@klientId", _klientId);
-                cmdW.Parameters.AddWithValue("@filmId", filmId);
-                cmdW.Parameters.AddWithValue("@data", DateTime.Today);
-                cmdW.Parameters.AddWithValue("@termin", terminZwrotu);
-                cmdW.ExecuteNonQuery();
+                DataRow dr = dsB.Tables["wypozyczenia"].NewRow();
+                dr["klientid"] = _klientId;
+                dr["filmid"] = filmId;
+                dr["datawypozyczenia"] = DateOnly.FromDateTime(DateTime.Today);
+                dr["terminzwrotu"] = DateOnly.FromDateTime(terminZwrotu);
+                dr["status"] = "Aktywne";
+                dsB.Tables["wypozyczenia"].Rows.Add(dr);
 
-                // Zmniejsz liczbę dostępnych kopii
-                string sqlKopie = @"
-                    UPDATE Filmy SET DostepneKopie = DostepneKopie - 1
-                    WHERE FilmID = @filmId";
+                if (dsB.HasChanges())
+                    dsF = dsB.GetChanges();
 
-                using var cmdK = new NpgsqlCommand(sqlKopie, conn, trans);
-                cmdK.Parameters.AddWithValue("@filmId", filmId);
-                cmdK.ExecuteNonQuery();
+                if (dsF.HasErrors)
+                {
+                    dsB.RejectChanges();
+                    MessageBox.Show("Błąd w danych – wypożyczenie anulowane.", "Błąd danych",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
 
-                trans.Commit();
+                conn.Open();
+                adp.InsertCommand.Connection = conn;
+                adp.Update(dsF, "wypozyczenia");
+
+                cmdKopie.Connection = conn;
+                cmdKopie.ExecuteNonQuery();
 
                 MessageBox.Show("Wypożyczenie zostało zarejestrowane!", "Sukces",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -173,93 +218,112 @@ namespace Wypożyczalnia_filmow
             }
             catch (Exception ex)
             {
-                trans.Rollback();
+                dsB.RejectChanges();
                 MessageBox.Show($"Błąd podczas wypożyczania:\n{ex.Message}", "Błąd",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                conn.Close();
             }
         }
 
         private int LiczbaAktywnychWypozyczen()
         {
-            string sql = @"
-                SELECT COUNT(*) FROM Wypozyczenia
-                WHERE KlientID = @id AND Status = 'Aktywne'";
+            NpgsqlConnection conn = Database.GetConnection();
+            NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT COUNT(*) FROM wypozyczenia WHERE klientid = @id AND status = 'Aktywne'", conn);
 
-            using var conn = Database.GetConnection();
-            conn.Open();
-            using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("@id", _klientId);
-            return Convert.ToInt32(cmd.ExecuteScalar());
+
+            int wynik = 0;
+            try
+            {
+                conn.Open();
+                wynik = Convert.ToInt32(cmd.ExecuteScalar());
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Błąd: {ex.Message}");
+            }
+            finally
+            {
+                conn.Close();
+            }
+
+            return wynik;
         }
 
         // ─────────────────────────────────────────────
-        // MOJE WYPOŻYCZENIA
+        // MOJE WYPOŻYCZENIA – SELECT z widoku v_aktywne_wypozyczenia
         // ─────────────────────────────────────────────
 
         private void ZaladujWypozyczenia()
         {
-            string sql = @"
-                SELECT w.WypozyczenieID, f.Tytul,
-                       w.DataWypozyczenia, w.TerminZwrotu,
-                       w.DataZwrotu, w.Status,
-                       COALESCE(SUM(k.Kwota), 0) AS Kara
-                FROM Wypozyczenia w
-                JOIN Filmy f ON w.FilmID = f.FilmID
-                LEFT JOIN Kary k ON w.WypozyczenieID = k.WypozyczenieID AND k.CzyOplacona = false
-                WHERE w.KlientID = @id AND w.Status = 'Aktywne'
-                GROUP BY w.WypozyczenieID, f.Tytul, w.DataWypozyczenia, w.TerminZwrotu,
-                         w.DataZwrotu, w.Status
-                ORDER BY w.TerminZwrotu";
+            NpgsqlConnection conn = Database.GetConnection();
+            NpgsqlDataAdapter adp = new NpgsqlDataAdapter();
+            DataSet dsB = new DataSet();
 
-            using var conn = Database.GetConnection();
-            conn.Open();
-            using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@id", _klientId);
+            // Widok v_aktywne_wypozyczenia zawiera już JOIN z filmami i LEFT JOIN z karami
+            string STR_SELECT =
+                "SELECT wypozyczenieID, filmid, tytul, datawypozyczenia, terminzwrotu, datazwrotu, status, kara " +
+                "FROM v_aktywne_wypozyczenia " +
+                "WHERE klientid = @id " +
+                "ORDER BY terminzwrotu";
 
-            var adapter = new NpgsqlDataAdapter(cmd);
-            var dt = new DataTable();
-            adapter.Fill(dt);
+            try
+            {
+                adp = new NpgsqlDataAdapter(STR_SELECT, conn);
+                adp.SelectCommand.Parameters.AddWithValue("@id", _klientId);
+                adp.Fill(dsB, "wypozyczenia");
 
-            dgvWypozyczenia.DataSource = dt;
+                bsWypozyczenia.DataSource = dsB.Tables["wypozyczenia"];
+                dgvWypozyczenia.DataSource = bsWypozyczenia;
 
-            if (dgvWypozyczenia.Columns["WypozyczenieID"] != null)
-                dgvWypozyczenia.Columns["WypozyczenieID"].Visible = false;
+                if (dgvWypozyczenia.Columns["wypozyczenieID"] != null)
+                    dgvWypozyczenia.Columns["wypozyczenieID"].Visible = false;
+                if (dgvWypozyczenia.Columns["filmid"] != null)
+                    dgvWypozyczenia.Columns["filmid"].Visible = false;
 
-            if (dgvWypozyczenia.Columns["Tytul"] != null)           dgvWypozyczenia.Columns["Tytul"].HeaderText           = "Tytuł";
-            if (dgvWypozyczenia.Columns["DataWypozyczenia"] != null) dgvWypozyczenia.Columns["DataWypozyczenia"].HeaderText = "Data wypożyczenia";
-            if (dgvWypozyczenia.Columns["TerminZwrotu"] != null)     dgvWypozyczenia.Columns["TerminZwrotu"].HeaderText     = "Termin zwrotu";
-            if (dgvWypozyczenia.Columns["DataZwrotu"] != null)       dgvWypozyczenia.Columns["DataZwrotu"].HeaderText       = "Data zwrotu";
-            if (dgvWypozyczenia.Columns["Status"] != null)           dgvWypozyczenia.Columns["Status"].HeaderText           = "Status";
-            if (dgvWypozyczenia.Columns["Kara"] != null)             dgvWypozyczenia.Columns["Kara"].HeaderText             = "Kara (zł)";
+                if (dgvWypozyczenia.Columns["tytul"] != null) dgvWypozyczenia.Columns["tytul"].HeaderText = "Tytuł";
+                if (dgvWypozyczenia.Columns["datawypozyczenia"] != null) dgvWypozyczenia.Columns["datawypozyczenia"].HeaderText = "Data wypożyczenia";
+                if (dgvWypozyczenia.Columns["terminzwrotu"] != null) dgvWypozyczenia.Columns["terminzwrotu"].HeaderText = "Termin zwrotu";
+                if (dgvWypozyczenia.Columns["datazwrotu"] != null) dgvWypozyczenia.Columns["datazwrotu"].HeaderText = "Data zwrotu";
+                if (dgvWypozyczenia.Columns["status"] != null) dgvWypozyczenia.Columns["status"].HeaderText = "Status";
+                if (dgvWypozyczenia.Columns["kara"] != null) dgvWypozyczenia.Columns["kara"].HeaderText = "Kara (zł)";
 
-            // Pokaż łączną karę
-            decimal lacznaKara = 0;
-            foreach (DataRow row in dt.Rows)
-                lacznaKara += Convert.ToDecimal(row["Kara"]);
+                decimal lacznaKara = 0;
+                foreach (DataRow row in dsB.Tables["wypozyczenia"].Rows)
+                    lacznaKara += Convert.ToDecimal(row["kara"]);
 
-            lblKara.Text = lacznaKara > 0
-                ? $"Łączna kara do zapłaty: {lacznaKara:F2} zł"
-                : "";
+                lblKara.Text = lacznaKara > 0
+                    ? $"Łączna kara do zapłaty: {lacznaKara:F2} zł"
+                    : "";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Błąd: {ex.Message}");
+            }
         }
 
         // ─────────────────────────────────────────────
-        // ZWROT FILMU
+        // ZWROT FILMU – UPDATE przez adapter + DataSet
         // ─────────────────────────────────────────────
 
         private void btnZwroc_Click(object sender, EventArgs e)
         {
             if (dgvWypozyczenia.CurrentRow == null) return;
 
-            int wypozyczenieId = Convert.ToInt32(dgvWypozyczenia.CurrentRow.Cells["WypozyczenieID"].Value);
-            string tytul       = dgvWypozyczenia.CurrentRow.Cells["Tytul"].Value.ToString()!;
-            DateTime termin = ((DateOnly)dgvWypozyczenia.CurrentRow.Cells["TerminZwrotu"].Value).ToDateTime(TimeOnly.MinValue);
-
+            int wypozyczenieId = Convert.ToInt32(dgvWypozyczenia.CurrentRow.Cells["wypozyczenieID"].Value);
+            string tytul = dgvWypozyczenia.CurrentRow.Cells["tytul"].Value.ToString()!;
+            DateOnly terminDate = (DateOnly)dgvWypozyczenia.CurrentRow.Cells["terminzwrotu"].Value;
+            DateTime termin = terminDate.ToDateTime(TimeOnly.MinValue);
+            int filmId = Convert.ToInt32(dgvWypozyczenia.CurrentRow.Cells["filmid"].Value);
             int spoznienie = (DateTime.Today - termin).Days;
-            string komunikat = $"Zwracasz film: {tytul}\n";
 
+            string komunikat = $"Zwracasz film: {tytul}\n";
             if (spoznienie > 0)
                 komunikat += $"Spóźnienie: {spoznienie} dni\n(kara zostanie naliczona automatycznie)\n";
-
             komunikat += "\nCzy potwierdzasz zwrot?";
 
             var wynik = MessageBox.Show(komunikat, "Potwierdzenie zwrotu",
@@ -267,65 +331,69 @@ namespace Wypożyczalnia_filmow
 
             if (wynik != DialogResult.Yes) return;
 
-            using var conn = Database.GetConnection();
-            conn.Open();
-            using var trans = conn.BeginTransaction();
+            NpgsqlConnection conn = Database.GetConnection();
+            NpgsqlDataAdapter adp = new NpgsqlDataAdapter();
+            DataSet dsB = new DataSet();
+            DataSet dsF = new DataSet();
+
+            string STR_SELECT = "SELECT wypozyczenieID, datazwrotu, status FROM wypozyczenia WHERE wypozyczenieID = @id";
+            string STR_UPDATE = "UPDATE wypozyczenia SET datazwrotu = @datazwrotu, status = @status WHERE wypozyczenieID = @wypozyczenieID";
+            string STR_UPD_KOPIE = "UPDATE filmy SET dostepnekopie = dostepnekopie + 1 WHERE filmid = @filmId";
+
+            NpgsqlCommand cmdUpdate = new NpgsqlCommand(STR_UPDATE, conn);
+            cmdUpdate.Parameters.Add("@datazwrotu", NpgsqlTypes.NpgsqlDbType.Date, 0, "datazwrotu");
+            cmdUpdate.Parameters.Add("@status", NpgsqlTypes.NpgsqlDbType.Text, 0, "status");
+            cmdUpdate.Parameters.Add("@wypozyczenieID", NpgsqlTypes.NpgsqlDbType.Integer, 0, "wypozyczenieID");
+
+            NpgsqlCommand cmdKopie = new NpgsqlCommand(STR_UPD_KOPIE, conn);
+            cmdKopie.Parameters.AddWithValue("@filmId", filmId);
+
+            adp = new NpgsqlDataAdapter(STR_SELECT, conn);
+            adp.SelectCommand.Parameters.AddWithValue("@id", wypozyczenieId);
+            adp.UpdateCommand = cmdUpdate;
 
             try
             {
-                // Pobierz FilmID żeby zwiększyć kopie
-                int filmId;
-                using (var cmdF = new NpgsqlCommand(
-                    "SELECT FilmID FROM Wypozyczenia WHERE WypozyczenieID = @id", conn, trans))
+                adp.Fill(dsB, "wypozyczenia");
+
+                DataRow dr = dsB.Tables["wypozyczenia"].Rows[0];
+                dr["datazwrotu"] = DateOnly.FromDateTime(DateTime.Today);
+                dr["status"] = "Zwrócone";
+
+                if (dsB.HasChanges())
+                    dsF = dsB.GetChanges();
+
+                if (dsF.HasErrors)
                 {
-                    cmdF.Parameters.AddWithValue("@id", wypozyczenieId);
-                    filmId = Convert.ToInt32(cmdF.ExecuteScalar());
+                    dsB.RejectChanges();
+                    MessageBox.Show("Błąd w danych – zwrot anulowany.", "Błąd danych",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
 
-                // Zaktualizuj wypożyczenie
-                string sqlZwrot = @"
-                    UPDATE Wypozyczenia
-                    SET DataZwrotu = @data, Status = 'Zwrócone'
-                    WHERE WypozyczenieID = @id";
+                conn.Open();
+                adp.UpdateCommand.Connection = conn;
+                adp.Update(dsF, "wypozyczenia");
 
-                using var cmdZ = new NpgsqlCommand(sqlZwrot, conn, trans);
-                cmdZ.Parameters.AddWithValue("@data", DateTime.Today);
-                cmdZ.Parameters.AddWithValue("@id", wypozyczenieId);
-                cmdZ.ExecuteNonQuery();
+                cmdKopie.Connection = conn;
+                cmdKopie.ExecuteNonQuery();
 
-                // Zwiększ dostępne kopie
-                using var cmdK = new NpgsqlCommand(
-                    "UPDATE Filmy SET DostepneKopie = DostepneKopie + 1 WHERE FilmID = @filmId",
-                    conn, trans);
-                cmdK.Parameters.AddWithValue("@filmId", filmId);
-                cmdK.ExecuteNonQuery();
-
-                // Nalicz karę jeśli po terminie
                 if (spoznienie > 0)
                 {
-                    // Pobierz CenaZaDzien
-                    decimal cena;
-                    using (var cmdC = new NpgsqlCommand(
-                        "SELECT CenaZaDzien FROM Filmy WHERE FilmID = @filmId", conn, trans))
-                    {
-                        cmdC.Parameters.AddWithValue("@filmId", filmId);
-                        cena = Convert.ToDecimal(cmdC.ExecuteScalar());
-                    }
-
+                    NpgsqlCommand cmdCena = new NpgsqlCommand(
+                        "SELECT cenazadzien FROM filmy WHERE filmid = @filmId", conn);
+                    cmdCena.Parameters.AddWithValue("@filmId", filmId);
+                    decimal cena = Convert.ToDecimal(cmdCena.ExecuteScalar());
                     decimal kwotaKary = cena * spoznienie;
 
-                    string sqlKara = @"
-                        INSERT INTO Kary (WypozyczenieID, Kwota, CzyOplacona, DataNaliczenia)
-                        VALUES (@wypozyczenieId, @kwota, false, @data)";
-
-                    using var cmdKara = new NpgsqlCommand(sqlKara, conn, trans);
+                    NpgsqlCommand cmdKara = new NpgsqlCommand(
+                        "INSERT INTO kary (wypozyczenieID, kwota, czyoplacona, datanaliczenia) " +
+                        "VALUES (@wypozyczenieId, @kwota, false, @data)", conn);
                     cmdKara.Parameters.AddWithValue("@wypozyczenieId", wypozyczenieId);
                     cmdKara.Parameters.AddWithValue("@kwota", kwotaKary);
-                    cmdKara.Parameters.AddWithValue("@data", DateTime.Today);
+                    cmdKara.Parameters.AddWithValue("@data", DateOnly.FromDateTime(DateTime.Today));
                     cmdKara.ExecuteNonQuery();
                 }
-
-                trans.Commit();
 
                 string msg = spoznienie > 0
                     ? $"Film zwrócony. Naliczono karę za {spoznienie} dni spóźnienia."
@@ -339,9 +407,242 @@ namespace Wypożyczalnia_filmow
             }
             catch (Exception ex)
             {
-                trans.Rollback();
+                dsB.RejectChanges();
                 MessageBox.Show($"Błąd podczas zwrotu:\n{ex.Message}", "Błąd",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                conn.Close();
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // ANULOWANIE WYPOŻYCZENIA – DELETE przez adapter + DataSet
+        // ─────────────────────────────────────────────
+
+        private void btnAnuluj_Click(object sender, EventArgs e)
+        {
+            if (dgvWypozyczenia.CurrentRow == null) return;
+
+            int wypozyczenieId = Convert.ToInt32(dgvWypozyczenia.CurrentRow.Cells["wypozyczenieID"].Value);
+            string tytul = dgvWypozyczenia.CurrentRow.Cells["tytul"].Value.ToString()!;
+            int filmId = Convert.ToInt32(dgvWypozyczenia.CurrentRow.Cells["filmid"].Value);
+
+            var wynik = MessageBox.Show(
+                $"Czy na pewno chcesz anulować wypożyczenie filmu:\n{tytul}?",
+                "Potwierdzenie anulowania",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+            if (wynik != DialogResult.Yes) return;
+
+            NpgsqlConnection conn = Database.GetConnection();
+            NpgsqlDataAdapter adp = new NpgsqlDataAdapter();
+            DataSet dataSetBase = new DataSet();
+            DataSet dataSetFinal = new DataSet();
+
+            string STR_SELECT = "SELECT wypozyczenieID FROM wypozyczenia WHERE wypozyczenieID = @id";
+            string STR_DELETE = "DELETE FROM wypozyczenia WHERE wypozyczenieID = @id";
+            string STR_UPD_KOPIE = "UPDATE filmy SET dostepnekopie = dostepnekopie + 1 WHERE filmid = @filmId";
+
+            NpgsqlCommand cmd = new NpgsqlCommand(STR_DELETE, conn);
+            cmd.Parameters.AddWithValue("@id", wypozyczenieId);
+
+            NpgsqlCommand cmdKopie = new NpgsqlCommand(STR_UPD_KOPIE, conn);
+            cmdKopie.Parameters.AddWithValue("@filmId", filmId);
+
+            adp = new NpgsqlDataAdapter(STR_SELECT, conn);
+            adp.SelectCommand.Parameters.AddWithValue("@id", wypozyczenieId);
+            adp.DeleteCommand = cmd;
+
+            adp.Fill(dataSetBase, "wypozyczenia");
+            adp.Fill(dataSetFinal, "wypozyczenia");
+
+            try
+            {
+                conn.Open();
+                adp.DeleteCommand.Connection = conn;
+                adp.DeleteCommand.ExecuteNonQuery();
+
+                cmdKopie.Connection = conn;
+                cmdKopie.ExecuteNonQuery();
+
+                conn.Close();
+
+                if (dataSetBase.HasChanges())
+                    dataSetFinal = dataSetBase.GetChanges();
+
+                if (dataSetFinal.HasErrors)
+                {
+                    dataSetBase.RejectChanges();
+                    MessageBox.Show("Błąd w danych lokalnych.", "Błąd",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                else
+                {
+                    adp.Update(dataSetFinal, "wypozyczenia");
+                }
+
+                MessageBox.Show("Wypożyczenie zostało anulowane.", "Anulowano",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                ZaladujFilmy(txtSzukaj.Text.Trim());
+                ZaladujWypozyczenia();
+            }
+            catch (Exception ex)
+            {
+                dataSetBase.RejectChanges();
+                MessageBox.Show($"Błąd podczas anulowania:\n{ex.Message}", "Błąd",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                conn.Close();
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // ZARZĄDZANIE KATALOGIEM – wyświetlanie
+        // ─────────────────────────────────────────────
+
+        private void ZaladujZarzadzanie()
+        {
+            NpgsqlConnection conn = Database.GetConnection();
+            NpgsqlDataAdapter adp = new NpgsqlDataAdapter();
+            DataSet dsB = new DataSet();
+
+            // Ten sam widok co katalog – pokazujemy te same dane
+            string STR_SELECT =
+                "SELECT filmid, tytul, gatunek, rokprodukcji, rezyser, dostepnekopie, cenazadzien " +
+                "FROM v_katalog_filmow " +
+                "ORDER BY tytul";
+
+            try
+            {
+                adp = new NpgsqlDataAdapter(STR_SELECT, conn);
+                adp.Fill(dsB, "filmy");
+
+                bsZarzadzanie.DataSource = dsB.Tables["filmy"];
+                dgvZarzadzanie.DataSource = bsZarzadzanie;
+
+                if (dgvZarzadzanie.Columns["filmid"] != null)
+                    dgvZarzadzanie.Columns["filmid"].Visible = false;
+
+                if (dgvZarzadzanie.Columns["tytul"] != null) dgvZarzadzanie.Columns["tytul"].HeaderText = "Tytuł";
+                if (dgvZarzadzanie.Columns["gatunek"] != null) dgvZarzadzanie.Columns["gatunek"].HeaderText = "Gatunek";
+                if (dgvZarzadzanie.Columns["rokprodukcji"] != null) dgvZarzadzanie.Columns["rokprodukcji"].HeaderText = "Rok";
+                if (dgvZarzadzanie.Columns["rezyser"] != null) dgvZarzadzanie.Columns["rezyser"].HeaderText = "Reżyser";
+                if (dgvZarzadzanie.Columns["dostepnekopie"] != null) dgvZarzadzanie.Columns["dostepnekopie"].HeaderText = "Dostępne kopie";
+                if (dgvZarzadzanie.Columns["cenazadzien"] != null) dgvZarzadzanie.Columns["cenazadzien"].HeaderText = "Cena / dzień";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Błąd: {ex.Message}");
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // DODAWANIE FILMU – otwiera FormDodajFilm
+        // ─────────────────────────────────────────────
+
+        private void btnDodajFilm_Click(object sender, EventArgs e)
+        {
+            FormDodajFilm formDodaj = new FormDodajFilm();
+            formDodaj.ShowDialog(this);
+
+            // Odśwież oba gridy jeśli film został zapisany
+            if (formDodaj.FilmZapisany)
+            {
+                ZaladujZarzadzanie();
+                ZaladujFilmy(txtSzukaj.Text.Trim());
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // USUWANIE FILMU – DELETE przez adapter + DataSet
+        // ─────────────────────────────────────────────
+
+        private void btnUsunFilm_Click(object sender, EventArgs e)
+        {
+            if (dgvZarzadzanie.CurrentRow == null) return;
+
+            int filmId = Convert.ToInt32(dgvZarzadzanie.CurrentRow.Cells["filmid"].Value);
+            string tytul = dgvZarzadzanie.CurrentRow.Cells["tytul"].Value.ToString()!;
+            int kopie = Convert.ToInt32(dgvZarzadzanie.CurrentRow.Cells["dostepnekopie"].Value);
+
+            // Nie pozwalamy usunąć filmu który ma aktywne wypożyczenia
+            if (kopie == 0)
+            {
+                MessageBox.Show(
+                    $"Film \"{tytul}\" ma aktywne wypożyczenia – nie można go usunąć.",
+                    "Operacja niemożliwa",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var wynik = MessageBox.Show(
+                $"Czy na pewno chcesz usunąć film:\n\"{tytul}\"?\n\nOperacja jest nieodwracalna.",
+                "Potwierdzenie usunięcia",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+            if (wynik != DialogResult.Yes) return;
+
+            NpgsqlConnection conn = Database.GetConnection();
+            NpgsqlDataAdapter adp = new NpgsqlDataAdapter();
+            DataSet dataSetBase = new DataSet();
+            DataSet dataSetFinal = new DataSet();
+
+            string STR_SELECT = "SELECT filmid FROM filmy WHERE filmid = @id";
+            string STR_DELETE = "DELETE FROM filmy WHERE filmid = @id";
+
+            NpgsqlCommand cmd = new NpgsqlCommand(STR_DELETE, conn);
+            cmd.Parameters.AddWithValue("@id", filmId);
+
+            adp = new NpgsqlDataAdapter(STR_SELECT, conn);
+            adp.SelectCommand.Parameters.AddWithValue("@id", filmId);
+            adp.DeleteCommand = cmd;
+
+            adp.Fill(dataSetBase, "filmy");
+            adp.Fill(dataSetFinal, "filmy");
+
+            try
+            {
+                conn.Open();
+                adp.DeleteCommand.Connection = conn;
+                adp.DeleteCommand.ExecuteNonQuery();
+                conn.Close();
+
+                if (dataSetBase.HasChanges())
+                    dataSetFinal = dataSetBase.GetChanges();
+
+                if (dataSetFinal.HasErrors)
+                {
+                    dataSetBase.RejectChanges();
+                    MessageBox.Show("Błąd w danych lokalnych.", "Błąd",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                else
+                {
+                    adp.Update(dataSetFinal, "filmy");
+                }
+
+                MessageBox.Show($"Film \"{tytul}\" został usunięty z katalogu.", "Usunięto",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                ZaladujZarzadzanie();
+                ZaladujFilmy(txtSzukaj.Text.Trim());
+            }
+            catch (Exception ex)
+            {
+                dataSetBase.RejectChanges();
+                MessageBox.Show($"Błąd podczas usuwania:\n{ex.Message}", "Błąd",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                conn.Close();
             }
         }
     }
