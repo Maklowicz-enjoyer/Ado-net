@@ -7,7 +7,6 @@ namespace Wypożyczalnia_filmow
 {
     public partial class FormDodajFilm : Form
     {
-        // Zwracamy true gdy film został zapisany, żeby FormMain odświeżył listę
         public bool FilmZapisany { get; private set; } = false;
 
         public FormDodajFilm()
@@ -26,18 +25,18 @@ namespace Wypożyczalnia_filmow
 
         private void ZaladujGatunki()
         {
-            NpgsqlConnection conn = Database.GetConnection();
-            NpgsqlDataAdapter adp = new NpgsqlDataAdapter();
-            DataSet dsB = new DataSet();
-
             string STR_SELECT = "SELECT gatunekid, nazwa FROM gatunki ORDER BY nazwa";
 
             try
             {
-                adp = new NpgsqlDataAdapter(STR_SELECT, conn);
-                adp.Fill(dsB, "gatunki");
+                DataSet dsB = new DataSet();
 
-                // Podpinamy DataTable pod ComboBox
+                using (NpgsqlConnection conn = Database.GetConnection())
+                using (NpgsqlDataAdapter adp = new NpgsqlDataAdapter(STR_SELECT, conn))
+                {
+                    adp.Fill(dsB, "gatunki");
+                }
+
                 cmbGatunek.DataSource = dsB.Tables["gatunki"];
                 cmbGatunek.DisplayMember = "nazwa";
                 cmbGatunek.ValueMember = "gatunekid";
@@ -68,53 +67,57 @@ namespace Wypożyczalnia_filmow
                 return;
             }
 
-            NpgsqlConnection conn = Database.GetConnection();
-            NpgsqlDataAdapter adp = new NpgsqlDataAdapter();
-            DataSet dsB = new DataSet();
-            DataSet dsF = new DataSet();
-
-            string STR_SELECT = "SELECT filmid, tytul, gatunekid, rokprodukcji, rezyser, dostepnekopie, cenazadzien FROM filmy WHERE 1=0";
+            string STR_SELECT = "SELECT filmid, tytul, gatunekid, rokprodukcji, rezyser, dostepnekopie, cenazadzien " +
+                                 "FROM filmy WHERE 1=0";
             string STR_INSERT = "INSERT INTO filmy (tytul, gatunekid, rokprodukcji, rezyser, dostepnekopie, cenazadzien) " +
-                                "VALUES (@tytul, @gatunekid, @rok, @rezyser, @kopie, @cena)";
-
-            NpgsqlCommand cmdInsert = new NpgsqlCommand(STR_INSERT, conn);
-            cmdInsert.Parameters.Add("@tytul", NpgsqlTypes.NpgsqlDbType.Varchar, 200, "tytul");
-            cmdInsert.Parameters.Add("@gatunekid", NpgsqlTypes.NpgsqlDbType.Integer, 0, "gatunekid");
-            cmdInsert.Parameters.Add("@rok", NpgsqlTypes.NpgsqlDbType.Integer, 0, "rokprodukcji");
-            cmdInsert.Parameters.Add("@rezyser", NpgsqlTypes.NpgsqlDbType.Varchar, 200, "rezyser");
-            cmdInsert.Parameters.Add("@kopie", NpgsqlTypes.NpgsqlDbType.Integer, 0, "dostepnekopie");
-            cmdInsert.Parameters.Add("@cena", NpgsqlTypes.NpgsqlDbType.Numeric, 0, "cenazadzien");
-
-            adp = new NpgsqlDataAdapter(STR_SELECT, conn);
-            adp.InsertCommand = cmdInsert;
+                                 "VALUES (@tytul, @gatunekid, @rok, @rezyser, @kopie, @cena)";
 
             try
             {
-                adp.Fill(dsB, "filmy");
+                DataSet dsB = new DataSet();
+                DataSet dsF = new DataSet();
 
-                DataRow dr = dsB.Tables["filmy"].NewRow();
-                dr["tytul"] = txtTytul.Text.Trim();
-                dr["gatunekid"] = Convert.ToInt32(cmbGatunek.SelectedValue);
-                dr["rokprodukcji"] = Convert.ToInt32(numRok.Value);
-                dr["rezyser"] = txtRezyser.Text.Trim();
-                dr["dostepnekopie"] = Convert.ToInt32(numKopie.Value);
-                dr["cenazadzien"] = numCena.Value;
-                dsB.Tables["filmy"].Rows.Add(dr);
-
-                if (dsB.HasChanges())
-                    dsF = dsB.GetChanges();
-
-                if (dsF.HasErrors)
+                using (NpgsqlConnection conn = Database.GetConnection())
+                using (NpgsqlCommand cmdInsert = new NpgsqlCommand(STR_INSERT, conn))
                 {
-                    dsB.RejectChanges();
-                    MessageBox.Show("Błąd w danych – film nie został zapisany.", "Błąd danych",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
+                    cmdInsert.Parameters.Add("@tytul", NpgsqlTypes.NpgsqlDbType.Varchar, 200, "tytul");
+                    cmdInsert.Parameters.Add("@gatunekid", NpgsqlTypes.NpgsqlDbType.Integer, 0, "gatunekid");
+                    cmdInsert.Parameters.Add("@rok", NpgsqlTypes.NpgsqlDbType.Integer, 0, "rokprodukcji");
+                    cmdInsert.Parameters.Add("@rezyser", NpgsqlTypes.NpgsqlDbType.Varchar, 200, "rezyser");
+                    cmdInsert.Parameters.Add("@kopie", NpgsqlTypes.NpgsqlDbType.Integer, 0, "dostepnekopie");
+                    cmdInsert.Parameters.Add("@cena", NpgsqlTypes.NpgsqlDbType.Numeric, 0, "cenazadzien");
 
-                conn.Open();
-                adp.InsertCommand.Connection = conn;
-                adp.Update(dsF, "filmy");
+                    using (NpgsqlDataAdapter adp = new NpgsqlDataAdapter(STR_SELECT, conn))
+                    {
+                        adp.InsertCommand = cmdInsert;
+
+                        adp.Fill(dsB, "filmy");
+
+                        DataRow dr = dsB.Tables["filmy"].NewRow();
+                        dr["tytul"] = txtTytul.Text.Trim();
+                        dr["gatunekid"] = Convert.ToInt32(cmbGatunek.SelectedValue);
+                        dr["rokprodukcji"] = Convert.ToInt32(numRok.Value);
+                        dr["rezyser"] = txtRezyser.Text.Trim();
+                        dr["dostepnekopie"] = Convert.ToInt32(numKopie.Value);
+                        dr["cenazadzien"] = numCena.Value;
+                        dsB.Tables["filmy"].Rows.Add(dr);
+
+                        if (dsB.HasChanges())
+                            dsF = dsB.GetChanges();
+
+                        if (dsF.HasErrors)
+                        {
+                            dsB.RejectChanges();
+                            MessageBox.Show("Błąd w danych – film nie został zapisany.", "Błąd danych",
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+
+                        conn.Open();
+                        adp.InsertCommand.Connection = conn;
+                        adp.Update(dsF, "filmy");
+                    }
+                }
 
                 FilmZapisany = true;
 
@@ -125,13 +128,8 @@ namespace Wypożyczalnia_filmow
             }
             catch (Exception ex)
             {
-                dsB.RejectChanges();
                 MessageBox.Show($"Błąd podczas zapisu:\n{ex.Message}", "Błąd",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            finally
-            {
-                conn.Close();
             }
         }
 
