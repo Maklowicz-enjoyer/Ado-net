@@ -22,6 +22,7 @@
         private System.Windows.Forms.DataGridView dgvWypozyczenia;
         private System.Windows.Forms.Label lblKara;
         private System.Windows.Forms.Button btnZwroc;
+        private System.Windows.Forms.Button btnOplacKare;
 
         // Zarządzanie katalogiem
         private System.Windows.Forms.DataGridView dgvZarzadzanie;
@@ -72,6 +73,7 @@
             btnWypozycz = new System.Windows.Forms.Button();
             lblKara = new System.Windows.Forms.Label();
             btnZwroc = new System.Windows.Forms.Button();
+            btnOplacKare = new System.Windows.Forms.Button();
             btnDodajFilm = new System.Windows.Forms.Button();
             btnUsunFilm = new System.Windows.Forms.Button();
 
@@ -141,6 +143,7 @@
             tabMoje.Padding = new System.Windows.Forms.Padding(8);
             tabMoje.Controls.Add(dgvWypozyczenia);  // Fill – dodany jako pierwszy
             tabMoje.Controls.Add(btnZwroc);
+            tabMoje.Controls.Add(btnOplacKare);
             tabMoje.Controls.Add(lblKara);
 
             dgvWypozyczenia.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -166,6 +169,14 @@
             btnZwroc.Height = 36;
             btnZwroc.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
             btnZwroc.Click += new System.EventHandler(btnZwroc_Click);
+
+            btnOplacKare.Dock = System.Windows.Forms.DockStyle.Bottom;
+            btnOplacKare.Name = "btnOplacKare";
+            btnOplacKare.Text = "Opłać karę";
+            btnOplacKare.Height = 36;
+            btnOplacKare.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
+            btnOplacKare.ForeColor = System.Drawing.Color.DarkGreen;
+            btnOplacKare.Click += new System.EventHandler(btnOplacKare_Click);
 
             // ══════════════════════════════════════════
             // TAB: ZARZĄDZANIE KATALOGIEM

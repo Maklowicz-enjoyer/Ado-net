@@ -25,7 +25,8 @@ C. Biblioteki zewnętrzne (NuGet):
 D. Komponenty UI (WinForms):
    - DataGridView (prezentacja danych w tabelach).
    - BindingSource i BindingNavigator (nawigacja i wiązanie danych).
-   - TabControl (podział na Katalog i Moje Wypożyczenia).
+   - TabControl (podział na trzy zakładki: Katalog filmów, Moje wypożyczenia,
+     Zarządzanie katalogiem).
 
 3. WYTYCZNE DOTYCZĄCE KONFIGURACJI
 ----------------------------------
@@ -50,11 +51,19 @@ A. Katalog filmów (Zakładka 1):
    - System sprawdza dostępność kopii przed zatwierdzeniem operacji.
 
 B. Moje wypożyczenia (Zakładka 2):
-   - Przeglądanie: Tabela wyświetla aktualnie wypożyczone filmy, terminy 
+   - Przeglądanie: Tabela wyświetla aktualnie wypożyczone filmy, terminy
      zwrotu oraz ewentualne naliczone kary.
-   - Zwrot filmu: Zaznacz film i kliknij "Zwróć zaznaczony". 
-   - Kary: Jeśli termin zwrotu minął, system automatycznie wyliczy karę 
+   - Zwrot filmu: Zaznacz film i kliknij "Zwróć zaznaczony".
+   - Kary: Jeśli termin zwrotu minął, system automatycznie wyliczy karę
      na podstawie ceny za dzień i liczby dni spóźnienia.
+   - Opłacanie kary (RB1): Zaznacz wypożyczenie i kliknij "Opłać karę",
+     aby uregulować nieopłaconą karę. Do czasu opłacenia kary system
+     blokuje możliwość dokonania nowego wypożyczenia.
+
+C. Zarządzanie katalogiem (Zakładka 3):
+   - Dodawanie: Kliknij "Dodaj film", aby otworzyć formularz dodawania.
+   - Usuwanie: Zaznacz film i kliknij "Usuń zaznaczony film". Usunięcie
+     jest niemożliwe, jeśli film ma aktywne wypożyczenia (RB5).
 
 5. ARCHITEKTURA DANYCH I BEZPIECZEŃSTWO
 ---------------------------------------

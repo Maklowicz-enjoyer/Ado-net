@@ -122,6 +122,14 @@ namespace Wypożyczalnia_filmow
             int kopie = Convert.ToInt32(dgvFilmy.CurrentRow.Cells["dostepnekopie"].Value);
             decimal cena = Convert.ToDecimal(dgvFilmy.CurrentRow.Cells["cenazadzien"].Value);
 
+            // RB1: blokada przy nieopłaconej karze
+            if (MaNieoplaconaKare() > 0)
+            {
+                MessageBox.Show("Masz nieopłaconą karę — ureguluj ją przed wypożyczeniem.", "Blokada konta",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             if (kopie <= 0)
             {
                 MessageBox.Show("Brak dostępnych kopii tego filmu.", "Niedostępny",
@@ -163,51 +171,64 @@ namespace Wypożyczalnia_filmow
 
                 using (NpgsqlConnection conn = Database.GetConnection())
                 {
-                    using (NpgsqlCommand cmdInsert = new NpgsqlCommand(STR_INSERT, conn))
+                    conn.Open();
+                    using (NpgsqlTransaction tx = conn.BeginTransaction())
                     {
-                        cmdInsert.Parameters.Add("@klientId", NpgsqlTypes.NpgsqlDbType.Integer, 0, "klientid");
-                        cmdInsert.Parameters.Add("@filmId", NpgsqlTypes.NpgsqlDbType.Integer, 0, "filmid");
-                        cmdInsert.Parameters.Add("@data", NpgsqlTypes.NpgsqlDbType.Date, 0, "datawypozyczenia");
-                        cmdInsert.Parameters.Add("@termin", NpgsqlTypes.NpgsqlDbType.Date, 0, "terminzwrotu");
-                        cmdInsert.Parameters.Add("@status", NpgsqlTypes.NpgsqlDbType.Text, 0, "status");
-
-                        using (NpgsqlDataAdapter adp = new NpgsqlDataAdapter(STR_SELECT, conn))
+                        try
                         {
-                            adp.SelectCommand.Parameters.AddWithValue("@klientId", _klientId);
-                            adp.InsertCommand = cmdInsert;
-
-                            adp.Fill(dsB, "wypozyczenia");
-
-                            DataRow dr = dsB.Tables["wypozyczenia"].NewRow();
-                            dr["klientid"] = _klientId;
-                            dr["filmid"] = filmId;
-                            dr["datawypozyczenia"] = DateOnly.FromDateTime(DateTime.Today);
-                            dr["terminzwrotu"] = DateOnly.FromDateTime(terminZwrotu);
-                            dr["status"] = "Aktywne";
-                            dsB.Tables["wypozyczenia"].Rows.Add(dr);
-
-                            if (dsB.HasChanges())
-                                dsF = dsB.GetChanges();
-
-                            if (dsF.HasErrors)
+                            // 1) INSERT wypożyczenia przez adapter + DataSet (warstwa bezpołączeniowa)
+                            using (NpgsqlCommand cmdInsert = new NpgsqlCommand(STR_INSERT, conn, tx))
                             {
-                                dsB.RejectChanges();
-                                MessageBox.Show("Błąd w danych – wypożyczenie anulowane.", "Błąd danych",
-                                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                return;
+                                cmdInsert.Parameters.Add("@klientId", NpgsqlTypes.NpgsqlDbType.Integer, 0, "klientid");
+                                cmdInsert.Parameters.Add("@filmId", NpgsqlTypes.NpgsqlDbType.Integer, 0, "filmid");
+                                cmdInsert.Parameters.Add("@data", NpgsqlTypes.NpgsqlDbType.Date, 0, "datawypozyczenia");
+                                cmdInsert.Parameters.Add("@termin", NpgsqlTypes.NpgsqlDbType.Date, 0, "terminzwrotu");
+                                cmdInsert.Parameters.Add("@status", NpgsqlTypes.NpgsqlDbType.Text, 0, "status");
+
+                                using (NpgsqlDataAdapter adp = new NpgsqlDataAdapter(STR_SELECT, conn))
+                                {
+                                    adp.SelectCommand.Parameters.AddWithValue("@klientId", _klientId);
+                                    adp.SelectCommand.Transaction = tx; // WAŻNE – Npgsql wymaga transakcji na każdej komendzie
+                                    adp.InsertCommand = cmdInsert;
+
+                                    // Połączenie już otwarte – Fill go nie zamknie
+                                    adp.Fill(dsB, "wypozyczenia");
+
+                                    DataRow dr = dsB.Tables["wypozyczenia"].NewRow();
+                                    dr["klientid"] = _klientId;
+                                    dr["filmid"] = filmId;
+                                    dr["datawypozyczenia"] = DateOnly.FromDateTime(DateTime.Today);
+                                    dr["terminzwrotu"] = DateOnly.FromDateTime(terminZwrotu);
+                                    dr["status"] = "Aktywne";
+                                    dsB.Tables["wypozyczenia"].Rows.Add(dr);
+
+                                    if (dsB.HasChanges())
+                                        dsF = dsB.GetChanges();
+
+                                    if (dsF.HasErrors)
+                                    {
+                                        dsB.RejectChanges();
+                                        throw new InvalidOperationException("Błąd w danych lokalnych – wypożyczenie anulowane.");
+                                    }
+
+                                    adp.Update(dsF, "wypozyczenia");
+                                }
                             }
 
-                            conn.Open();
-                            adp.InsertCommand.Connection = conn;
-                            adp.Update(dsF, "wypozyczenia");
-                        }
-                    }
+                            // 2) Zmniejszamy licznik dostępnych kopii – ta sama transakcja
+                            using (NpgsqlCommand cmdKopie = new NpgsqlCommand(STR_UPD_KOPIE, conn, tx))
+                            {
+                                cmdKopie.Parameters.AddWithValue("@filmId", filmId);
+                                cmdKopie.ExecuteNonQuery();
+                            }
 
-                    // Zmniejszamy licznik dostępnych kopii
-                    using (NpgsqlCommand cmdKopie = new NpgsqlCommand(STR_UPD_KOPIE, conn))
-                    {
-                        cmdKopie.Parameters.AddWithValue("@filmId", filmId);
-                        cmdKopie.ExecuteNonQuery();
+                            tx.Commit();
+                        }
+                        catch
+                        {
+                            tx.Rollback();
+                            throw; // wyjątek obsługuje zewnętrzny catch
+                        }
                     }
                 }
 
@@ -222,6 +243,33 @@ namespace Wypożyczalnia_filmow
                 MessageBox.Show($"Błąd podczas wypożyczania:\n{ex.Message}", "Błąd",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        // Warstwa połączeniowa – ExecuteScalar, szybki odczyt pojedynczej wartości (RB1)
+        private int MaNieoplaconaKare()
+        {
+            string STR_SELECT =
+                "SELECT COUNT(*) FROM kary k " +
+                "JOIN wypozyczenia w ON w.wypozyczenieid = k.wypozyczenieid " +
+                "WHERE w.klientid = @id AND k.czyoplacona = false";
+            int wynik = 0;
+
+            try
+            {
+                using (NpgsqlConnection conn = Database.GetConnection())
+                using (NpgsqlCommand cmd = new NpgsqlCommand(STR_SELECT, conn))
+                {
+                    cmd.Parameters.AddWithValue("@id", _klientId);
+                    conn.Open();
+                    wynik = Convert.ToInt32(cmd.ExecuteScalar());
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Błąd: {ex.Message}");
+            }
+
+            return wynik;
         }
 
         // Warstwa połączeniowa – ExecuteScalar, szybki odczyt pojedynczej wartości
@@ -336,66 +384,79 @@ namespace Wypożyczalnia_filmow
 
                 using (NpgsqlConnection conn = Database.GetConnection())
                 {
-                    using (NpgsqlCommand cmdUpdate = new NpgsqlCommand(STR_UPDATE, conn))
+                    conn.Open();
+                    using (NpgsqlTransaction tx = conn.BeginTransaction())
                     {
-                        cmdUpdate.Parameters.Add("@datazwrotu", NpgsqlTypes.NpgsqlDbType.Date, 0, "datazwrotu");
-                        cmdUpdate.Parameters.Add("@status", NpgsqlTypes.NpgsqlDbType.Text, 0, "status");
-                        cmdUpdate.Parameters.Add("@wypozyczenieid", NpgsqlTypes.NpgsqlDbType.Integer, 0, "wypozyczenieid");
-
-                        using (NpgsqlDataAdapter adp = new NpgsqlDataAdapter(STR_SELECT, conn))
+                        try
                         {
-                            adp.SelectCommand.Parameters.AddWithValue("@id", wypozyczenieId);
-                            adp.UpdateCommand = cmdUpdate;
-
-                            adp.Fill(dsB, "wypozyczenia");
-
-                            DataRow dr = dsB.Tables["wypozyczenia"].Rows[0];
-                            dr["datazwrotu"] = DateOnly.FromDateTime(DateTime.Today);
-                            dr["status"] = "Zwrócone";
-
-                            if (dsB.HasChanges())
-                                dsF = dsB.GetChanges();
-
-                            if (dsF.HasErrors)
+                            // 1) UPDATE wypozyczenia przez adapter + DataSet (warstwa bezpołączeniowa)
+                            using (NpgsqlCommand cmdUpdate = new NpgsqlCommand(STR_UPDATE, conn, tx))
                             {
-                                dsB.RejectChanges();
-                                MessageBox.Show("Błąd w danych – zwrot anulowany.", "Błąd danych",
-                                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                return;
+                                cmdUpdate.Parameters.Add("@datazwrotu", NpgsqlTypes.NpgsqlDbType.Date, 0, "datazwrotu");
+                                cmdUpdate.Parameters.Add("@status", NpgsqlTypes.NpgsqlDbType.Text, 0, "status");
+                                cmdUpdate.Parameters.Add("@wypozyczenieid", NpgsqlTypes.NpgsqlDbType.Integer, 0, "wypozyczenieid");
+
+                                using (NpgsqlDataAdapter adp = new NpgsqlDataAdapter(STR_SELECT, conn))
+                                {
+                                    adp.SelectCommand.Parameters.AddWithValue("@id", wypozyczenieId);
+                                    adp.SelectCommand.Transaction = tx; // WAŻNE – Npgsql wymaga transakcji na każdej komendzie
+                                    adp.UpdateCommand = cmdUpdate;
+
+                                    // Połączenie już otwarte – Fill go nie zamknie
+                                    adp.Fill(dsB, "wypozyczenia");
+
+                                    DataRow dr = dsB.Tables["wypozyczenia"].Rows[0];
+                                    dr["datazwrotu"] = DateOnly.FromDateTime(DateTime.Today);
+                                    dr["status"] = "Zwrócone";
+
+                                    if (dsB.HasChanges())
+                                        dsF = dsB.GetChanges();
+
+                                    if (dsF.HasErrors)
+                                    {
+                                        dsB.RejectChanges();
+                                        throw new InvalidOperationException("Błąd w danych lokalnych – zwrot anulowany.");
+                                    }
+
+                                    adp.Update(dsF, "wypozyczenia");
+                                }
                             }
 
-                            conn.Open();
-                            adp.UpdateCommand.Connection = conn;
-                            adp.Update(dsF, "wypozyczenia");
+                            // 2) Przywracamy kopię do katalogu – ta sama transakcja
+                            using (NpgsqlCommand cmdKopie = new NpgsqlCommand(STR_UPD_KOPIE, conn, tx))
+                            {
+                                cmdKopie.Parameters.AddWithValue("@filmId", filmId);
+                                cmdKopie.ExecuteNonQuery();
+                            }
+
+                            // 3) Naliczamy karę jeśli wystąpiło spóźnienie (RB4) – ta sama transakcja
+                            if (spoznienie > 0)
+                            {
+                                using (NpgsqlCommand cmdCena = new NpgsqlCommand(
+                                    "SELECT cenazadzien FROM filmy WHERE filmid = @filmId", conn, tx))
+                                {
+                                    cmdCena.Parameters.AddWithValue("@filmId", filmId);
+                                    decimal cena = Convert.ToDecimal(cmdCena.ExecuteScalar());
+                                    decimal kwotaKary = cena * spoznienie;
+
+                                    using (NpgsqlCommand cmdKara = new NpgsqlCommand(
+                                        "INSERT INTO kary (wypozyczenieid, kwota, czyoplacona, datanaliczenia) " +
+                                        "VALUES (@wypozyczenieId, @kwota, false, @data)", conn, tx))
+                                    {
+                                        cmdKara.Parameters.AddWithValue("@wypozyczenieId", wypozyczenieId);
+                                        cmdKara.Parameters.AddWithValue("@kwota", kwotaKary);
+                                        cmdKara.Parameters.AddWithValue("@data", DateOnly.FromDateTime(DateTime.Today));
+                                        cmdKara.ExecuteNonQuery();
+                                    }
+                                }
+                            }
+
+                            tx.Commit();
                         }
-                    }
-
-                    // Przywracamy kopię do katalogu
-                    using (NpgsqlCommand cmdKopie = new NpgsqlCommand(STR_UPD_KOPIE, conn))
-                    {
-                        cmdKopie.Parameters.AddWithValue("@filmId", filmId);
-                        cmdKopie.ExecuteNonQuery();
-                    }
-
-                    // Naliczamy karę jeśli wystąpiło spóźnienie (RB4)
-                    if (spoznienie > 0)
-                    {
-                        using (NpgsqlCommand cmdCena = new NpgsqlCommand(
-                            "SELECT cenazadzien FROM filmy WHERE filmid = @filmId", conn))
+                        catch
                         {
-                            cmdCena.Parameters.AddWithValue("@filmId", filmId);
-                            decimal cena = Convert.ToDecimal(cmdCena.ExecuteScalar());
-                            decimal kwotaKary = cena * spoznienie;
-
-                            using (NpgsqlCommand cmdKara = new NpgsqlCommand(
-                                "INSERT INTO kary (wypozyczenieid, kwota, czyoplacona, datanaliczenia) " +
-                                "VALUES (@wypozyczenieId, @kwota, false, @data)", conn))
-                            {
-                                cmdKara.Parameters.AddWithValue("@wypozyczenieId", wypozyczenieId);
-                                cmdKara.Parameters.AddWithValue("@kwota", kwotaKary);
-                                cmdKara.Parameters.AddWithValue("@data", DateOnly.FromDateTime(DateTime.Today));
-                                cmdKara.ExecuteNonQuery();
-                            }
+                            tx.Rollback();
+                            throw; // wyjątek obsługuje zewnętrzny catch
                         }
                     }
                 }
@@ -413,6 +474,58 @@ namespace Wypożyczalnia_filmow
             catch (Exception ex)
             {
                 MessageBox.Show($"Błąd podczas zwrotu:\n{ex.Message}", "Błąd",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // OPŁACANIE KARY (Zadanie 3)
+        // ─────────────────────────────────────────────
+
+        private void btnOplacKare_Click(object sender, EventArgs e)
+        {
+            if (dgvWypozyczenia.CurrentRow == null) return;
+
+            int wypozyczenieId = Convert.ToInt32(dgvWypozyczenia.CurrentRow.Cells["wypozyczenieid"].Value);
+            string tytul = dgvWypozyczenia.CurrentRow.Cells["tytul"].Value.ToString()!;
+
+            string STR_CHECK = "SELECT COUNT(*) FROM kary WHERE wypozyczenieid = @id AND czyoplacona = false";
+            string STR_UPDATE = "UPDATE kary SET czyoplacona = true WHERE wypozyczenieid = @id AND czyoplacona = false";
+
+            try
+            {
+                using (NpgsqlConnection conn = Database.GetConnection())
+                {
+                    conn.Open();
+
+                    using (NpgsqlCommand cmdCheck = new NpgsqlCommand(STR_CHECK, conn))
+                    {
+                        cmdCheck.Parameters.AddWithValue("@id", wypozyczenieId);
+                        int liczbaNieoplaconych = Convert.ToInt32(cmdCheck.ExecuteScalar());
+
+                        if (liczbaNieoplaconych == 0)
+                        {
+                            MessageBox.Show("Zaznaczone wypożyczenie nie ma nieopłaconych kar.", "Brak kar",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
+                    }
+
+                    using (NpgsqlCommand cmdUpdate = new NpgsqlCommand(STR_UPDATE, conn))
+                    {
+                        cmdUpdate.Parameters.AddWithValue("@id", wypozyczenieId);
+                        cmdUpdate.ExecuteNonQuery();
+                    }
+                }
+
+                MessageBox.Show($"Kara za film \"{tytul}\" została opłacona.", "Opłacono",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                ZaladujWypozyczenia();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Błąd podczas opłacania kary:\n{ex.Message}", "Błąd",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
