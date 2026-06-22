@@ -51,7 +51,6 @@
             ((System.ComponentModel.ISupportInitialize)numCena).BeginInit();
             SuspendLayout();
 
-            // ── Etykiety ───────────────────────────────────────────
             int labelX = 20;
             int inputX = 140;
             int w = 260;
@@ -72,20 +71,17 @@
                 lbl.Font = new System.Drawing.Font("Segoe UI", 9.5F);
             }
 
-            // ── txtTytul ───────────────────────────────────────────
             txtTytul.Location = new System.Drawing.Point(inputX, rows[0]);
             txtTytul.Width = w;
             txtTytul.Font = new System.Drawing.Font("Segoe UI", 9.5F);
             txtTytul.Name = "txtTytul";
 
-            // ── cmbGatunek ─────────────────────────────────────────
             cmbGatunek.Location = new System.Drawing.Point(inputX, rows[1]);
             cmbGatunek.Width = w;
             cmbGatunek.Font = new System.Drawing.Font("Segoe UI", 9.5F);
             cmbGatunek.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             cmbGatunek.Name = "cmbGatunek";
 
-            // ── numRok ─────────────────────────────────────────────
             numRok.Location = new System.Drawing.Point(inputX, rows[2]);
             numRok.Width = w;
             numRok.Font = new System.Drawing.Font("Segoe UI", 9.5F);
@@ -94,13 +90,11 @@
             numRok.Value = DateTime.Now.Year;
             numRok.Name = "numRok";
 
-            // ── txtRezyser ─────────────────────────────────────────
             txtRezyser.Location = new System.Drawing.Point(inputX, rows[3]);
             txtRezyser.Width = w;
             txtRezyser.Font = new System.Drawing.Font("Segoe UI", 9.5F);
             txtRezyser.Name = "txtRezyser";
 
-            // ── numKopie ───────────────────────────────────────────
             numKopie.Location = new System.Drawing.Point(inputX, rows[4]);
             numKopie.Width = w;
             numKopie.Font = new System.Drawing.Font("Segoe UI", 9.5F);
@@ -109,7 +103,6 @@
             numKopie.Value = 1;
             numKopie.Name = "numKopie";
 
-            // ── numCena ────────────────────────────────────────────
             numCena.Location = new System.Drawing.Point(inputX, rows[5]);
             numCena.Width = w;
             numCena.Font = new System.Drawing.Font("Segoe UI", 9.5F);
@@ -118,8 +111,6 @@
             numCena.DecimalPlaces = 2;
             numCena.Value = 5;
             numCena.Name = "numCena";
-
-            // ── btnZapisz ──────────────────────────────────────────
             btnZapisz.Location = new System.Drawing.Point(inputX, 270);
             btnZapisz.Width = 120;
             btnZapisz.Height = 36;
@@ -131,7 +122,6 @@
             btnZapisz.Name = "btnZapisz";
             btnZapisz.Click += new System.EventHandler(btnZapisz_Click);
 
-            // ── btnAnuluj ──────────────────────────────────────────
             btnAnuluj.Location = new System.Drawing.Point(inputX + 130, 270);
             btnAnuluj.Width = 120;
             btnAnuluj.Height = 36;
@@ -139,8 +129,6 @@
             btnAnuluj.Font = new System.Drawing.Font("Segoe UI", 9.5F);
             btnAnuluj.Name = "btnAnuluj";
             btnAnuluj.Click += new System.EventHandler(btnAnuluj_Click);
-
-            // ── FormDodajFilm ──────────────────────────────────────
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             ClientSize = new System.Drawing.Size(440, 330);

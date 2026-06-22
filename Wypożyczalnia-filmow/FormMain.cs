@@ -17,9 +17,7 @@ namespace Wypożyczalnia_filmow
             InitializeComponent();
         }
 
-        // ─────────────────────────────────────────────
-        // ŁADOWANIE FORMULARZA
-        // ─────────────────────────────────────────────
+
 
         private void FormMain_Load(object sender, EventArgs e)
         {
@@ -29,9 +27,7 @@ namespace Wypożyczalnia_filmow
             ZaladujZarzadzanie();
         }
 
-        // ─────────────────────────────────────────────
-        // KLIENT – warstwa połączeniowa (DataReader)
-        // ─────────────────────────────────────────────
+
 
         private void ZaladujKlienta()
         {
@@ -61,9 +57,6 @@ namespace Wypożyczalnia_filmow
             }
         }
 
-        // ─────────────────────────────────────────────
-        // KATALOG FILMÓW – SELECT z widoku v_katalog_filmow
-        // ─────────────────────────────────────────────
 
         private void ZaladujFilmy(string filtr = "")
         {
@@ -109,9 +102,6 @@ namespace Wypożyczalnia_filmow
             ZaladujFilmy(txtSzukaj.Text.Trim());
         }
 
-        // ─────────────────────────────────────────────
-        // WYPOŻYCZANIE – INSERT przez adapter + DataSet
-        // ─────────────────────────────────────────────
 
         private void btnWypozycz_Click(object sender, EventArgs e)
         {
@@ -122,7 +112,6 @@ namespace Wypożyczalnia_filmow
             int kopie = Convert.ToInt32(dgvFilmy.CurrentRow.Cells["dostepnekopie"].Value);
             decimal cena = Convert.ToDecimal(dgvFilmy.CurrentRow.Cells["cenazadzien"].Value);
 
-            // RB1: blokada przy nieopłaconej karze
             if (MaNieoplaconaKare() > 0)
             {
                 MessageBox.Show("Masz nieopłaconą karę — ureguluj ją przed wypożyczeniem.", "Blokada konta",
@@ -176,7 +165,6 @@ namespace Wypożyczalnia_filmow
                     {
                         try
                         {
-                            // 1) INSERT wypożyczenia przez adapter + DataSet (warstwa bezpołączeniowa)
                             using (NpgsqlCommand cmdInsert = new NpgsqlCommand(STR_INSERT, conn, tx))
                             {
                                 cmdInsert.Parameters.Add("@klientId", NpgsqlTypes.NpgsqlDbType.Integer, 0, "klientid");
@@ -188,10 +176,10 @@ namespace Wypożyczalnia_filmow
                                 using (NpgsqlDataAdapter adp = new NpgsqlDataAdapter(STR_SELECT, conn))
                                 {
                                     adp.SelectCommand.Parameters.AddWithValue("@klientId", _klientId);
-                                    adp.SelectCommand.Transaction = tx; // WAŻNE – Npgsql wymaga transakcji na każdej komendzie
+                                    adp.SelectCommand.Transaction = tx;
                                     adp.InsertCommand = cmdInsert;
 
-                                    // Połączenie już otwarte – Fill go nie zamknie
+
                                     adp.Fill(dsB, "wypozyczenia");
 
                                     DataRow dr = dsB.Tables["wypozyczenia"].NewRow();
@@ -215,7 +203,7 @@ namespace Wypożyczalnia_filmow
                                 }
                             }
 
-                            // 2) Zmniejszamy licznik dostępnych kopii – ta sama transakcja
+
                             using (NpgsqlCommand cmdKopie = new NpgsqlCommand(STR_UPD_KOPIE, conn, tx))
                             {
                                 cmdKopie.Parameters.AddWithValue("@filmId", filmId);
@@ -227,7 +215,7 @@ namespace Wypożyczalnia_filmow
                         catch
                         {
                             tx.Rollback();
-                            throw; // wyjątek obsługuje zewnętrzny catch
+                            throw; 
                         }
                     }
                 }
@@ -245,7 +233,6 @@ namespace Wypożyczalnia_filmow
             }
         }
 
-        // Warstwa połączeniowa – ExecuteScalar, szybki odczyt pojedynczej wartości (RB1)
         private int MaNieoplaconaKare()
         {
             string STR_SELECT =
@@ -272,7 +259,6 @@ namespace Wypożyczalnia_filmow
             return wynik;
         }
 
-        // Warstwa połączeniowa – ExecuteScalar, szybki odczyt pojedynczej wartości
         private int LiczbaAktywnychWypozyczen()
         {
             string STR_SELECT = "SELECT COUNT(*) FROM wypozyczenia WHERE klientid = @id AND status = 'Aktywne'";
@@ -296,9 +282,7 @@ namespace Wypożyczalnia_filmow
             return wynik;
         }
 
-        // ─────────────────────────────────────────────
-        // MOJE WYPOŻYCZENIA – SELECT z widoku v_aktywne_wypozyczenia
-        // ─────────────────────────────────────────────
+
 
         private void ZaladujWypozyczenia()
         {
@@ -348,9 +332,6 @@ namespace Wypożyczalnia_filmow
             }
         }
 
-        // ─────────────────────────────────────────────
-        // ZWROT FILMU – UPDATE przez adapter + DataSet
-        // ─────────────────────────────────────────────
 
         private void btnZwroc_Click(object sender, EventArgs e)
         {
@@ -389,7 +370,7 @@ namespace Wypożyczalnia_filmow
                     {
                         try
                         {
-                            // 1) UPDATE wypozyczenia przez adapter + DataSet (warstwa bezpołączeniowa)
+
                             using (NpgsqlCommand cmdUpdate = new NpgsqlCommand(STR_UPDATE, conn, tx))
                             {
                                 cmdUpdate.Parameters.Add("@datazwrotu", NpgsqlTypes.NpgsqlDbType.Date, 0, "datazwrotu");
@@ -399,10 +380,10 @@ namespace Wypożyczalnia_filmow
                                 using (NpgsqlDataAdapter adp = new NpgsqlDataAdapter(STR_SELECT, conn))
                                 {
                                     adp.SelectCommand.Parameters.AddWithValue("@id", wypozyczenieId);
-                                    adp.SelectCommand.Transaction = tx; // WAŻNE – Npgsql wymaga transakcji na każdej komendzie
+                                    adp.SelectCommand.Transaction = tx; 
                                     adp.UpdateCommand = cmdUpdate;
 
-                                    // Połączenie już otwarte – Fill go nie zamknie
+
                                     adp.Fill(dsB, "wypozyczenia");
 
                                     DataRow dr = dsB.Tables["wypozyczenia"].Rows[0];
@@ -422,14 +403,14 @@ namespace Wypożyczalnia_filmow
                                 }
                             }
 
-                            // 2) Przywracamy kopię do katalogu – ta sama transakcja
+
                             using (NpgsqlCommand cmdKopie = new NpgsqlCommand(STR_UPD_KOPIE, conn, tx))
                             {
                                 cmdKopie.Parameters.AddWithValue("@filmId", filmId);
                                 cmdKopie.ExecuteNonQuery();
                             }
 
-                            // 3) Naliczamy karę jeśli wystąpiło spóźnienie (RB4) – ta sama transakcja
+
                             if (spoznienie > 0)
                             {
                                 using (NpgsqlCommand cmdCena = new NpgsqlCommand(
@@ -456,7 +437,7 @@ namespace Wypożyczalnia_filmow
                         catch
                         {
                             tx.Rollback();
-                            throw; // wyjątek obsługuje zewnętrzny catch
+                            throw; 
                         }
                     }
                 }
@@ -478,9 +459,6 @@ namespace Wypożyczalnia_filmow
             }
         }
 
-        // ─────────────────────────────────────────────
-        // OPŁACANIE KARY (Zadanie 3)
-        // ─────────────────────────────────────────────
 
         private void btnOplacKare_Click(object sender, EventArgs e)
         {
@@ -530,9 +508,6 @@ namespace Wypożyczalnia_filmow
             }
         }
 
-        // ─────────────────────────────────────────────
-        // ZARZĄDZANIE KATALOGIEM – wyświetlanie
-        // ─────────────────────────────────────────────
 
         private void ZaladujZarzadzanie()
         {
@@ -570,9 +545,7 @@ namespace Wypożyczalnia_filmow
             }
         }
 
-        // ─────────────────────────────────────────────
-        // DODAWANIE FILMU – otwiera FormDodajFilm
-        // ─────────────────────────────────────────────
+
 
         private void btnDodajFilm_Click(object sender, EventArgs e)
         {
@@ -586,9 +559,7 @@ namespace Wypożyczalnia_filmow
             }
         }
 
-        // ─────────────────────────────────────────────
-        // USUWANIE FILMU – DELETE przez adapter + DataSet
-        // ─────────────────────────────────────────────
+
 
         private void btnUsunFilm_Click(object sender, EventArgs e)
         {
@@ -597,7 +568,6 @@ namespace Wypożyczalnia_filmow
             int filmId = Convert.ToInt32(dgvZarzadzanie.CurrentRow.Cells["filmid"].Value);
             string tytul = dgvZarzadzanie.CurrentRow.Cells["tytul"].Value.ToString()!;
 
-            // RB5: nie wolno usunąć filmu z aktywnymi wypożyczeniami
             if (MaAktywneWypozyczenia(filmId))
             {
                 MessageBox.Show(
@@ -634,7 +604,6 @@ namespace Wypożyczalnia_filmow
 
                         adp.Fill(dataSetBase, "filmy");
 
-                        // Oznaczamy wiersz jako usunięty w DataSet
                         dataSetBase.Tables["filmy"].Rows[0].Delete();
 
                         if (dataSetBase.HasChanges())
@@ -667,7 +636,6 @@ namespace Wypożyczalnia_filmow
             }
         }
 
-        // RB5: sprawdzamy aktywne wypożyczenia przez zapytanie, nie przez liczbę kopii
         private bool MaAktywneWypozyczenia(int filmId)
         {
             string STR_SELECT = "SELECT COUNT(*) FROM wypozyczenia WHERE filmid = @filmId AND status = 'Aktywne'";
@@ -685,7 +653,6 @@ namespace Wypożyczalnia_filmow
             catch (Exception ex)
             {
                 MessageBox.Show($"Błąd: {ex.Message}");
-                // W razie błędu blokujemy usunięcie – bezpieczniejsze zachowanie
                 return true;
             }
         }

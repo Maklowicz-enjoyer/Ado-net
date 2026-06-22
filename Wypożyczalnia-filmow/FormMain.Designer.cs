@@ -4,27 +4,23 @@
     {
         private System.ComponentModel.IContainer components = null;
 
-        // Kontrolki główne
         private System.Windows.Forms.Label lblKlient;
         private System.Windows.Forms.TabControl tabMain;
         private System.Windows.Forms.TabPage tabKatalog;
         private System.Windows.Forms.TabPage tabMoje;
         private System.Windows.Forms.TabPage tabZarzadzanie;
 
-        // Katalog filmów
         private System.Windows.Forms.TextBox txtSzukaj;
         private System.Windows.Forms.DataGridView dgvFilmy;
         private System.Windows.Forms.BindingSource bsFilmy;
         private System.Windows.Forms.BindingNavigator bnFilmy;
         private System.Windows.Forms.Button btnWypozycz;
 
-        // Moje wypożyczenia
         private System.Windows.Forms.DataGridView dgvWypozyczenia;
         private System.Windows.Forms.Label lblKara;
         private System.Windows.Forms.Button btnZwroc;
         private System.Windows.Forms.Button btnOplacKare;
 
-        // Zarządzanie katalogiem
         private System.Windows.Forms.DataGridView dgvZarzadzanie;
         private System.Windows.Forms.BindingSource bsZarzadzanie;
         private System.Windows.Forms.BindingNavigator bnZarzadzanie;
@@ -41,13 +37,11 @@
         {
             components = new System.ComponentModel.Container();
 
-            // ── BindingSources ─────────────────────────────────────
             bsFilmy = new System.Windows.Forms.BindingSource(components);
             bsZarzadzanie = new System.Windows.Forms.BindingSource(components);
             ((System.ComponentModel.ISupportInitialize)bsFilmy).BeginInit();
             ((System.ComponentModel.ISupportInitialize)bsZarzadzanie).BeginInit();
 
-            // ── DataGridViews ──────────────────────────────────────
             dgvFilmy = new System.Windows.Forms.DataGridView();
             dgvWypozyczenia = new System.Windows.Forms.DataGridView();
             dgvZarzadzanie = new System.Windows.Forms.DataGridView();
@@ -55,7 +49,6 @@
             ((System.ComponentModel.ISupportInitialize)dgvWypozyczenia).BeginInit();
             ((System.ComponentModel.ISupportInitialize)dgvZarzadzanie).BeginInit();
 
-            // ── BindingNavigators ──────────────────────────────────
             bnFilmy = new System.Windows.Forms.BindingNavigator(components);
             bnZarzadzanie = new System.Windows.Forms.BindingNavigator(components);
             ((System.ComponentModel.ISupportInitialize)bnFilmy).BeginInit();
@@ -63,7 +56,6 @@
             bnFilmy.BindingSource = bsFilmy;
             bnZarzadzanie.BindingSource = bsZarzadzanie;
 
-            // ── Pozostałe kontrolki ────────────────────────────────
             lblKlient = new System.Windows.Forms.Label();
             tabMain = new System.Windows.Forms.TabControl();
             tabKatalog = new System.Windows.Forms.TabPage();
@@ -83,14 +75,12 @@
             tabZarzadzanie.SuspendLayout();
             SuspendLayout();
 
-            // ── lblKlient ──────────────────────────────────────────
             lblKlient.AutoSize = true;
             lblKlient.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
             lblKlient.Location = new System.Drawing.Point(12, 9);
             lblKlient.Name = "lblKlient";
             lblKlient.Text = "Klient: ";
 
-            // ── tabMain ────────────────────────────────────────────
             tabMain.Dock = System.Windows.Forms.DockStyle.Fill;
             tabMain.Location = new System.Drawing.Point(0, 30);
             tabMain.Name = "tabMain";
@@ -98,13 +88,10 @@
             tabMain.Controls.Add(tabMoje);
             tabMain.Controls.Add(tabZarzadzanie);
 
-            // ══════════════════════════════════════════
-            // TAB: KATALOG FILMÓW
-            // ══════════════════════════════════════════
             tabKatalog.Text = "Katalog filmów";
             tabKatalog.Name = "tabKatalog";
             tabKatalog.Padding = new System.Windows.Forms.Padding(8);
-            tabKatalog.Controls.Add(dgvFilmy);      // Fill – dodany jako pierwszy
+            tabKatalog.Controls.Add(dgvFilmy);      
             tabKatalog.Controls.Add(btnWypozycz);
             tabKatalog.Controls.Add(bnFilmy);
             tabKatalog.Controls.Add(txtSzukaj);
@@ -135,13 +122,10 @@
             btnWypozycz.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
             btnWypozycz.Click += new System.EventHandler(btnWypozycz_Click);
 
-            // ══════════════════════════════════════════
-            // TAB: MOJE WYPOŻYCZENIA
-            // ══════════════════════════════════════════
             tabMoje.Text = "Moje wypożyczenia";
             tabMoje.Name = "tabMoje";
             tabMoje.Padding = new System.Windows.Forms.Padding(8);
-            tabMoje.Controls.Add(dgvWypozyczenia);  // Fill – dodany jako pierwszy
+            tabMoje.Controls.Add(dgvWypozyczenia); 
             tabMoje.Controls.Add(btnZwroc);
             tabMoje.Controls.Add(btnOplacKare);
             tabMoje.Controls.Add(lblKara);
@@ -178,13 +162,11 @@
             btnOplacKare.ForeColor = System.Drawing.Color.DarkGreen;
             btnOplacKare.Click += new System.EventHandler(btnOplacKare_Click);
 
-            // ══════════════════════════════════════════
-            // TAB: ZARZĄDZANIE KATALOGIEM
-            // ══════════════════════════════════════════
+
             tabZarzadzanie.Text = "Zarządzanie katalogiem";
             tabZarzadzanie.Name = "tabZarzadzanie";
             tabZarzadzanie.Padding = new System.Windows.Forms.Padding(8);
-            tabZarzadzanie.Controls.Add(dgvZarzadzanie);    // Fill – dodany jako pierwszy
+            tabZarzadzanie.Controls.Add(dgvZarzadzanie);   
             tabZarzadzanie.Controls.Add(btnUsunFilm);
             tabZarzadzanie.Controls.Add(btnDodajFilm);
             tabZarzadzanie.Controls.Add(bnZarzadzanie);
@@ -216,7 +198,6 @@
             btnUsunFilm.ForeColor = System.Drawing.Color.DarkRed;
             btnUsunFilm.Click += new System.EventHandler(btnUsunFilm_Click);
 
-            // ── FormMain ───────────────────────────────────────────
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             ClientSize = new System.Drawing.Size(900, 600);

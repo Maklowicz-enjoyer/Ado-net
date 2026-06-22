@@ -14,9 +14,7 @@ namespace Wypożyczalnia_filmow
             InitializeComponent();
         }
 
-        // ─────────────────────────────────────────────
-        // ŁADOWANIE – wypełnienie ComboBox gatunkami z bazy
-        // ─────────────────────────────────────────────
+
 
         private void FormDodajFilm_Load(object sender, EventArgs e)
         {
@@ -47,9 +45,6 @@ namespace Wypożyczalnia_filmow
             }
         }
 
-        // ─────────────────────────────────────────────
-        // ZAPIS – INSERT przez adapter + DataSet
-        // ─────────────────────────────────────────────
 
         private void btnZapisz_Click(object sender, EventArgs e)
         {
@@ -133,9 +128,6 @@ namespace Wypożyczalnia_filmow
             }
         }
 
-        // ─────────────────────────────────────────────
-        // ANULUJ – zamknij bez zapisu
-        // ─────────────────────────────────────────────
 
         private void btnAnuluj_Click(object sender, EventArgs e)
         {

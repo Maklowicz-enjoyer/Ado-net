@@ -5,10 +5,10 @@ namespace Wypożyczalnia_filmow
 {
     public static class Database
     {
-        private const string Host = "100.80.77.35";    // np. localhost lub adres IP
+        private const string Host = "100.80.77.35";
         private const string Port = "5432";
-        private const string DbName = "movie_rental";   // np. wypozyczalnia
-        private const string User = "appuser";   // np. postgres
+        private const string DbName = "movie_rental";
+        private const string User = "appuser";
 
         // Plik haslo.txt musi znajdować się w tym samym folderze co .exe (bin\Debug\...)
         private static readonly string PasswordFilePath =
