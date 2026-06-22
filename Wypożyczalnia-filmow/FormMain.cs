@@ -17,8 +17,6 @@ namespace Wypożyczalnia_filmow
             InitializeComponent();
         }
 
-
-
         private void FormMain_Load(object sender, EventArgs e)
         {
             ZaladujKlienta();
@@ -26,8 +24,6 @@ namespace Wypożyczalnia_filmow
             ZaladujWypozyczenia();
             ZaladujZarzadzanie();
         }
-
-
 
         private void ZaladujKlienta()
         {
@@ -56,7 +52,6 @@ namespace Wypożyczalnia_filmow
                 MessageBox.Show($"Błąd: {ex.Message}");
             }
         }
-
 
         private void ZaladujFilmy(string filtr = "")
         {
@@ -101,7 +96,6 @@ namespace Wypożyczalnia_filmow
         {
             ZaladujFilmy(txtSzukaj.Text.Trim());
         }
-
 
         private void btnWypozycz_Click(object sender, EventArgs e)
         {
@@ -179,7 +173,6 @@ namespace Wypożyczalnia_filmow
                                     adp.SelectCommand.Transaction = tx;
                                     adp.InsertCommand = cmdInsert;
 
-
                                     adp.Fill(dsB, "wypozyczenia");
 
                                     DataRow dr = dsB.Tables["wypozyczenia"].NewRow();
@@ -203,7 +196,6 @@ namespace Wypożyczalnia_filmow
                                 }
                             }
 
-
                             using (NpgsqlCommand cmdKopie = new NpgsqlCommand(STR_UPD_KOPIE, conn, tx))
                             {
                                 cmdKopie.Parameters.AddWithValue("@filmId", filmId);
@@ -215,7 +207,7 @@ namespace Wypożyczalnia_filmow
                         catch
                         {
                             tx.Rollback();
-                            throw; 
+                            throw;
                         }
                     }
                 }
@@ -282,15 +274,16 @@ namespace Wypożyczalnia_filmow
             return wynik;
         }
 
-
-
         private void ZaladujWypozyczenia()
         {
             string STR_SELECT =
-                "SELECT wypozyczenieid, filmid, tytul, datawypozyczenia, terminzwrotu, datazwrotu, status, kara " +
-                "FROM v_aktywne_wypozyczenia " +
-                "WHERE klientid = @id " +
-                "ORDER BY terminzwrotu";
+                "SELECT w.wypozyczenieid, w.filmid, f.tytul, w.datawypozyczenia, w.terminzwrotu, " +
+                "       w.datazwrotu, w.status, " +
+                "       GREATEST(0, (CURRENT_DATE - w.terminzwrotu) * f.cenazadzien) AS kara " +
+                "FROM wypozyczenia w " +
+                "JOIN filmy f ON f.filmid = w.filmid " +
+                "WHERE w.klientid = @id AND w.status = 'Aktywne' " +
+                "ORDER BY w.terminzwrotu";
 
             try
             {
@@ -332,7 +325,6 @@ namespace Wypożyczalnia_filmow
             }
         }
 
-
         private void btnZwroc_Click(object sender, EventArgs e)
         {
             if (dgvWypozyczenia.CurrentRow == null) return;
@@ -370,7 +362,6 @@ namespace Wypożyczalnia_filmow
                     {
                         try
                         {
-
                             using (NpgsqlCommand cmdUpdate = new NpgsqlCommand(STR_UPDATE, conn, tx))
                             {
                                 cmdUpdate.Parameters.Add("@datazwrotu", NpgsqlTypes.NpgsqlDbType.Date, 0, "datazwrotu");
@@ -380,9 +371,8 @@ namespace Wypożyczalnia_filmow
                                 using (NpgsqlDataAdapter adp = new NpgsqlDataAdapter(STR_SELECT, conn))
                                 {
                                     adp.SelectCommand.Parameters.AddWithValue("@id", wypozyczenieId);
-                                    adp.SelectCommand.Transaction = tx; 
+                                    adp.SelectCommand.Transaction = tx;
                                     adp.UpdateCommand = cmdUpdate;
-
 
                                     adp.Fill(dsB, "wypozyczenia");
 
@@ -403,13 +393,11 @@ namespace Wypożyczalnia_filmow
                                 }
                             }
 
-
                             using (NpgsqlCommand cmdKopie = new NpgsqlCommand(STR_UPD_KOPIE, conn, tx))
                             {
                                 cmdKopie.Parameters.AddWithValue("@filmId", filmId);
                                 cmdKopie.ExecuteNonQuery();
                             }
-
 
                             if (spoznienie > 0)
                             {
@@ -437,7 +425,7 @@ namespace Wypożyczalnia_filmow
                         catch
                         {
                             tx.Rollback();
-                            throw; 
+                            throw;
                         }
                     }
                 }
@@ -459,55 +447,79 @@ namespace Wypożyczalnia_filmow
             }
         }
 
-
         private void btnOplacKare_Click(object sender, EventArgs e)
         {
-            if (dgvWypozyczenia.CurrentRow == null) return;
-
-            int wypozyczenieId = Convert.ToInt32(dgvWypozyczenia.CurrentRow.Cells["wypozyczenieid"].Value);
-            string tytul = dgvWypozyczenia.CurrentRow.Cells["tytul"].Value.ToString()!;
-
-            string STR_CHECK = "SELECT COUNT(*) FROM kary WHERE wypozyczenieid = @id AND czyoplacona = false";
-            string STR_UPDATE = "UPDATE kary SET czyoplacona = true WHERE wypozyczenieid = @id AND czyoplacona = false";
+            string STR_SELECT =
+                "SELECT k.kwota, k.datanaliczenia, f.tytul " +
+                "FROM kary k " +
+                "JOIN wypozyczenia w ON w.wypozyczenieid = k.wypozyczenieid " +
+                "JOIN filmy f ON f.filmid = w.filmid " +
+                "WHERE w.klientid = @klientId AND k.czyoplacona = false " +
+                "ORDER BY k.datanaliczenia";
+            string STR_UPDATE =
+                "UPDATE kary SET czyoplacona = true " +
+                "WHERE wypozyczenieid IN " +
+                "  (SELECT wypozyczenieid FROM wypozyczenia WHERE klientid = @klientId) " +
+                "AND czyoplacona = false";
 
             try
             {
+                DataSet dsKary = new DataSet();
+
                 using (NpgsqlConnection conn = Database.GetConnection())
+                using (NpgsqlDataAdapter adp = new NpgsqlDataAdapter(STR_SELECT, conn))
                 {
-                    conn.Open();
-
-                    using (NpgsqlCommand cmdCheck = new NpgsqlCommand(STR_CHECK, conn))
-                    {
-                        cmdCheck.Parameters.AddWithValue("@id", wypozyczenieId);
-                        int liczbaNieoplaconych = Convert.ToInt32(cmdCheck.ExecuteScalar());
-
-                        if (liczbaNieoplaconych == 0)
-                        {
-                            MessageBox.Show("Zaznaczone wypożyczenie nie ma nieopłaconych kar.", "Brak kar",
-                                MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            return;
-                        }
-                    }
-
-                    using (NpgsqlCommand cmdUpdate = new NpgsqlCommand(STR_UPDATE, conn))
-                    {
-                        cmdUpdate.Parameters.AddWithValue("@id", wypozyczenieId);
-                        cmdUpdate.ExecuteNonQuery();
-                    }
+                    adp.SelectCommand.Parameters.AddWithValue("@klientId", _klientId);
+                    adp.Fill(dsKary, "kary");
                 }
 
-                MessageBox.Show($"Kara za film \"{tytul}\" została opłacona.", "Opłacono",
+                DataTable tabKary = dsKary.Tables["kary"];
+
+                if (tabKary.Rows.Count == 0)
+                {
+                    MessageBox.Show("Nie masz żadnych nieopłaconych kar.", "Brak kar",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("Nieopłacone kary:\n");
+                decimal suma = 0;
+                foreach (DataRow row in tabKary.Rows)
+                {
+                    string tytul = row["tytul"].ToString()!;
+                    decimal kwota = Convert.ToDecimal(row["kwota"]);
+                    DateOnly data = (DateOnly)row["datanaliczenia"];
+                    sb.AppendLine($"  • {tytul} — {kwota:F2} zł  (naliczona: {data:dd.MM.yyyy})");
+                    suma += kwota;
+                }
+                sb.AppendLine($"\nŁącznie do zapłaty: {suma:F2} zł");
+                sb.AppendLine("\nCzy chcesz opłacić wszystkie kary?");
+
+                var wynik = MessageBox.Show(sb.ToString(), "Opłać kary",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                if (wynik != DialogResult.Yes) return;
+
+                using (NpgsqlConnection conn = Database.GetConnection())
+                using (NpgsqlCommand cmd = new NpgsqlCommand(STR_UPDATE, conn))
+                {
+                    cmd.Parameters.AddWithValue("@klientId", _klientId);
+                    conn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+
+                MessageBox.Show("Wszystkie kary zostały opłacone.", "Opłacono",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 ZaladujWypozyczenia();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Błąd podczas opłacania kary:\n{ex.Message}", "Błąd",
+                MessageBox.Show($"Błąd podczas opłacania kar:\n{ex.Message}", "Błąd",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
 
         private void ZaladujZarzadzanie()
         {
@@ -545,8 +557,6 @@ namespace Wypożyczalnia_filmow
             }
         }
 
-
-
         private void btnDodajFilm_Click(object sender, EventArgs e)
         {
             FormDodajFilm formDodaj = new FormDodajFilm();
@@ -558,8 +568,6 @@ namespace Wypożyczalnia_filmow
                 ZaladujFilmy(txtSzukaj.Text.Trim());
             }
         }
-
-
 
         private void btnUsunFilm_Click(object sender, EventArgs e)
         {
@@ -593,33 +601,61 @@ namespace Wypożyczalnia_filmow
                 DataSet dataSetFinal = new DataSet();
 
                 using (NpgsqlConnection conn = Database.GetConnection())
-                using (NpgsqlCommand cmdDelete = new NpgsqlCommand(STR_DELETE, conn))
                 {
-                    cmdDelete.Parameters.AddWithValue("@id", filmId);
-
-                    using (NpgsqlDataAdapter adp = new NpgsqlDataAdapter(STR_SELECT, conn))
+                    conn.Open();
+                    using (NpgsqlTransaction tx = conn.BeginTransaction())
                     {
-                        adp.SelectCommand.Parameters.AddWithValue("@id", filmId);
-                        adp.DeleteCommand = cmdDelete;
-
-                        adp.Fill(dataSetBase, "filmy");
-
-                        dataSetBase.Tables["filmy"].Rows[0].Delete();
-
-                        if (dataSetBase.HasChanges())
-                            dataSetFinal = dataSetBase.GetChanges();
-
-                        if (dataSetFinal.HasErrors)
+                        try
                         {
-                            dataSetBase.RejectChanges();
-                            MessageBox.Show("Błąd w danych lokalnych.", "Błąd",
-                                MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            return;
-                        }
+                            using (NpgsqlCommand cmd = new NpgsqlCommand(
+                                "DELETE FROM kary WHERE wypozyczenieid IN " +
+                                "(SELECT wypozyczenieid FROM wypozyczenia WHERE filmid = @filmId)", conn, tx))
+                            {
+                                cmd.Parameters.AddWithValue("@filmId", filmId);
+                                cmd.ExecuteNonQuery();
+                            }
 
-                        conn.Open();
-                        adp.DeleteCommand.Connection = conn;
-                        adp.Update(dataSetFinal, "filmy");
+                            using (NpgsqlCommand cmd = new NpgsqlCommand(
+                                "DELETE FROM wypozyczenia WHERE filmid = @filmId", conn, tx))
+                            {
+                                cmd.Parameters.AddWithValue("@filmId", filmId);
+                                cmd.ExecuteNonQuery();
+                            }
+
+                            using (NpgsqlCommand cmdDelete = new NpgsqlCommand(STR_DELETE, conn, tx))
+                            {
+                                cmdDelete.Parameters.AddWithValue("@id", filmId);
+
+                                using (NpgsqlDataAdapter adp = new NpgsqlDataAdapter(STR_SELECT, conn))
+                                {
+                                    adp.SelectCommand.Parameters.AddWithValue("@id", filmId);
+                                    adp.SelectCommand.Transaction = tx;
+                                    adp.DeleteCommand = cmdDelete;
+
+                                    adp.Fill(dataSetBase, "filmy");
+
+                                    dataSetBase.Tables["filmy"].Rows[0].Delete();
+
+                                    if (dataSetBase.HasChanges())
+                                        dataSetFinal = dataSetBase.GetChanges();
+
+                                    if (dataSetFinal.HasErrors)
+                                    {
+                                        dataSetBase.RejectChanges();
+                                        throw new InvalidOperationException("Błąd w danych lokalnych.");
+                                    }
+
+                                    adp.Update(dataSetFinal, "filmy");
+                                }
+                            }
+
+                            tx.Commit();
+                        }
+                        catch
+                        {
+                            tx.Rollback();
+                            throw;
+                        }
                     }
                 }
 
@@ -638,12 +674,11 @@ namespace Wypożyczalnia_filmow
 
         private bool MaAktywneWypozyczenia(int filmId)
         {
-            string STR_SELECT = "SELECT COUNT(*) FROM wypozyczenia WHERE filmid = @filmId AND status = 'Aktywne'";
-
             try
             {
                 using (NpgsqlConnection conn = Database.GetConnection())
-                using (NpgsqlCommand cmd = new NpgsqlCommand(STR_SELECT, conn))
+                using (NpgsqlCommand cmd = new NpgsqlCommand(
+                    "SELECT COUNT(*) FROM wypozyczenia WHERE filmid = @filmId AND status = 'Aktywne'", conn))
                 {
                     cmd.Parameters.AddWithValue("@filmId", filmId);
                     conn.Open();
